@@ -1,0 +1,16 @@
+{
+  "name": "حروفي - تعلّم العربية",
+  "short_name": "حروفي",
+  "description": "تطبيق تعليمي للأطفال لتعلّم الحروف والكلمات العربية باللعب",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#8ecae6",
+  "theme_color": "#ffb703",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

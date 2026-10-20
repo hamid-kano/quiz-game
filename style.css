@@ -114,3 +114,8 @@ h1 { text-align: center; margin: 8px 0 4px; font-size: 32px; font-weight: 800; }
 .review-item.ok { border-inline-start-color: var(--good); }
 .review-item .q { font-weight: 700; margin-bottom: 4px; }
 .review-item .a { color: var(--muted); }
+
+.kids-link {
+  display: block; margin-top: 14px; padding: 12px; border-radius: var(--radius); text-align: center;
+  background: var(--card); color: var(--accent); font-weight: 700; text-decoration: none;
+}
