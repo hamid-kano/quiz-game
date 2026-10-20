@@ -6,7 +6,7 @@ import {
   NUMBERS, COUNT_EMOJIS, SENTENCES
 } from "./data.js";
 import { store } from "./store.js";
-import { speak, stopSpeech, sfx } from "./sfx.js";
+import { speak, stopSpeech, sfx, hasArabicVoice } from "./sfx.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms } from "./util.js";
 
 const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
@@ -169,6 +169,29 @@ export const GEN = {
     };
   },
 
+  listen() {
+    const pool = WORDS_SHORT.concat(WORDS_LONG.slice(0, 8));
+    const [target] = store.pickWeighted(pool, (w) => "lis:" + w.w);
+    const others = pick(pool.filter((x) => x.emoji !== target.emoji), optionCount() - 1);
+    // بدون صوت عربي نعرض الكلمة مكتوبة حتى لا يعلق الطفل
+    const canHear = store.settings.speech && hasArabicVoice();
+    return {
+      kind: "choice",
+      key: "lis:" + target.w,
+      target: target.w,
+      promptHtml: `<div class="q">اسمع الكلمة واختر صورتها</div><div class="ear">👂</div>${canHear ? "" : `<div class="big">${target.w}</div>`}`,
+      say: target.w,
+      options: shuffle([target, ...others]).map((w) => ({ id: w.w, html: w.emoji, right: w === target, emoji: true })),
+      praise: target.w
+    };
+  },
+
+  memory() {
+    const pairs = store.active.age === "small" ? 3 : 4;
+    const letters = store.pickWeighted(LETTERS, (L) => "snd:" + L.l, pairs);
+    return { kind: "memory", key: "mem:" + letters.map((L) => L.l).join(""), letters };
+  },
+
   build(level) {
     const pool = level?.words === "long" ? WORDS_LONG : WORDS_SHORT;
     const [target] = store.pickWeighted(pool, (w) => "w:" + w.w);
@@ -231,6 +254,7 @@ export function runSession(opt) {
     }
     s.seen.add(q.key);
     if (q.kind === "build") buildRound(s, q);
+    else if (q.kind === "memory") memoryRound(s, q);
     else if (q.kind === "trace") traceRound(s, q);
     else choiceRound(s, q);
   }
@@ -291,6 +315,73 @@ function choiceRound(s, q) {
       wrongCount++;
       // بعد خطأين نلمّح للإجابة بلطف حتى لا يُحبط الطفل
       if (wrongCount >= 2) $$(".choice")[q.options.findIndex((x) => x.right)].classList.add("hint");
+    }
+  }));
+}
+
+// ---------- لعبة الذاكرة ----------
+function memoryRound(s, q) {
+  const cards = shuffle(q.letters.flatMap((L) => [
+    { L, face: L.l, kind: "letter" },
+    { L, face: L.emoji, kind: "pic" }
+  ]));
+  let open = [];
+  let matched = 0;
+  let misses = 0;
+  let busy = false;
+  const missedLetters = new Set();
+
+  render(`
+    ${header(s)}
+    <div class="prompt compact"><div class="q">اقلب بطاقتين: طابق كل حرف مع صورة تبدأ به</div></div>
+    <div class="memory ${cards.length > 6 ? "four" : ""}">
+      ${cards.map((c, i) => `
+        <button class="mcard" data-i="${i}" aria-label="بطاقة">
+          <span class="mback">❓</span>
+          <span class="mface ${c.kind}">${c.face}</span>
+        </button>`).join("")}
+    </div>
+  `);
+  $("#back").onclick = s.exit;
+
+  const els = $$(".mcard");
+  els.forEach((el) => (el.onclick = () => {
+    const i = Number(el.dataset.i);
+    if (busy || el.classList.contains("open") || el.classList.contains("done")) return;
+    sfx.tap();
+    el.classList.add("open");
+    const c = cards[i];
+    speak(c.kind === "letter" ? c.L.name : c.L.word);
+    open.push(i);
+    if (open.length < 2) return;
+
+    const [a, b] = open.map((k) => cards[k]);
+    open.forEach((k) => els[k].classList.add("checking"));
+    busy = true;
+    if (a.L === b.L && a.kind !== b.kind) {
+      setTimeout(() => {
+        open.forEach((k) => { els[k].classList.remove("checking"); els[k].classList.add("done"); });
+        open = [];
+        busy = false;
+        matched++;
+        sfx.right();
+        speak(`${a.L.word} تبدأ بحرف ${a.L.name}`);
+        store.record("snd:" + a.L.l, !missedLetters.has(a.L.l));
+        if (matched === q.letters.length) {
+          // في لعبة الذاكرة بعض الأخطاء طبيعية، نحتسب الخطأ فقط إذا زاد عن عدد الأزواج
+          if (misses > q.letters.length) s.missed = true, s.mistakes++;
+          s.right({ key: q.key }, 1300);
+        }
+      }, 450);
+    } else {
+      misses++;
+      if (a.L !== b.L) { missedLetters.add(a.L.l); missedLetters.add(b.L.l); }
+      setTimeout(() => {
+        sfx.wrong();
+        open.forEach((k) => els[k].classList.remove("open", "checking"));
+        open = [];
+        busy = false;
+      }, 950);
     }
   }));
 }

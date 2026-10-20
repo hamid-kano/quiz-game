@@ -37,7 +37,7 @@ export function screenParents(back) {
 }
 
 // ---------- حساب الإحصاءات ----------
-function letterStatus(p, l) {
+export function letterStatus(p, l) {
   const keys = ["rec:", "snd:", "frm:", "trc:"].map((k) => p.mastery[k + l]).filter(Boolean);
   if (!keys.length) return { cls: "unseen", label: "لم يتدرّب بعد", score: -1, seen: 0, acc: 0 };
   const seen = keys.reduce((s, m) => s + m.seen, 0);

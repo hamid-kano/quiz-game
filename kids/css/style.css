@@ -371,3 +371,52 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
   .cert-view { box-shadow: none; padding: 0; border-radius: 0; }
   .cert-view img { border-radius: 0; }
 }
+
+/* ---------- لعبة الذاكرة ---------- */
+.memory { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.memory.four { grid-template-columns: repeat(4, 1fr); }
+.mcard {
+  position: relative; aspect-ratio: 3 / 4; border: 0; border-radius: 20px; cursor: pointer; padding: 0;
+  background: linear-gradient(135deg, var(--purple), #b388ff); box-shadow: 0 6px 0 #6656d6;
+  transition: transform .3s; transform-style: preserve-3d;
+}
+.mcard .mback, .mcard .mface {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 20px; backface-visibility: hidden;
+}
+.mcard .mback { font-size: 34px; color: #fff; }
+.mcard .mface { background: #fff; transform: rotateY(180deg); font-size: 46px; }
+.mcard .mface.letter { font-family: var(--letter-font); font-size: 54px; color: var(--orange); }
+.mcard.open, .mcard.done { transform: rotateY(180deg); }
+.mcard.done .mface { background: #e5f8ee; box-shadow: inset 0 0 0 4px var(--good); }
+.mcard.done { cursor: default; box-shadow: 0 6px 0 #1d8a55; }
+
+.ear { font-size: 72px; line-height: 1.3; animation: bob 1.6s ease-in-out infinite; }
+
+/* ---------- القصص ---------- */
+.library { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.book {
+  border: 0; background: #fff; border-radius: 20px; padding: 18px 8px; cursor: pointer; color: inherit;
+  box-shadow: 0 6px 0 var(--shadow), inset 8px 0 0 var(--sun); display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.book .cover { font-size: 64px; line-height: 1.2; }
+.book b { font-size: 18px; }
+.book small { color: var(--muted); }
+.book:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--shadow), inset 8px 0 0 var(--sun); }
+.story-pic { font-size: 96px; line-height: 1.25; }
+.story-pic.small { font-size: 48px; }
+.story-text { font-family: var(--letter-font); font-size: 32px; line-height: 2; margin: 8px 0 14px; }
+.word { border: 0; background: none; font: inherit; color: inherit; padding: 0 2px; border-radius: 8px; cursor: pointer; }
+.word.lit { background: #fff1b8; }
+
+/* ---------- حديقة الحروف ---------- */
+.garden {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px; border-radius: var(--radius);
+  background: linear-gradient(180deg, #b7e4a3, #8cc97a); box-shadow: 0 6px 0 #6aa95a;
+}
+.plot { border: 0; background: rgba(255,255,255,.35); border-radius: 16px; padding: 6px 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; color: var(--ink); }
+.plot .plant { font-size: 36px; line-height: 1.2; }
+.plot .pl { font-family: var(--letter-font); font-size: 22px; line-height: 1.3; }
+.plot.good { background: rgba(255,255,255,.7); }
+.plot.wiggle { animation: wiggle .5s; }
+.garden-legend { justify-content: center; }
+.quick { grid-template-columns: repeat(4, 1fr); }

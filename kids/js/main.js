@@ -8,6 +8,8 @@ import { render, $, $$, esc, toast, randomOf, plural } from "./util.js";
 import { GEN, runSession, showLesson } from "./games.js";
 import { screenParents } from "./parents.js";
 import { CERTIFICATES, checkCertificates, screenCertificate } from "./rewards.js";
+import { screenStories } from "./stories.js";
+import { screenGarden } from "./garden.js";
 
 // ---------- المستويات ----------
 export function visibleLevels(p = store.active) {
@@ -151,6 +153,7 @@ export function screenMap() {
     </button>
 
     <div class="quick">
+      <button class="quick-btn" id="garden">🌷<span>حديقتي</span><small>الحروف</small></button>
       <button class="quick-btn" id="album">🎁<span>ألبومي</span><small>${p.stickers.length}/${STICKERS.length}</small></button>
       <button class="quick-btn" id="certs">📜<span>شهاداتي</span><small>${p.certificates.length}/${CERTIFICATES.length}</small></button>
       <button class="quick-btn" id="parents">👪<span>للأهل</span><small>التقرير</small></button>
@@ -162,6 +165,7 @@ export function screenMap() {
   $("#who").onclick = screenProfiles;
   $("#daily").onclick = startDaily;
   $("#album").onclick = screenAlbum;
+  $("#garden").onclick = () => screenGarden(screenMap);
   $("#certs").onclick = screenCertificates;
   $("#parents").onclick = () => screenParents(screenMap);
   $$(".level").forEach((b) => (b.onclick = () => {
@@ -175,7 +179,11 @@ export function screenMap() {
 
 // ---------- تشغيل مستوى ----------
 export function startLevel(level) {
-  const total = level.type === "trace" ? Math.min(4, store.settings.rounds) : store.settings.rounds;
+  if (level.type === "stories") return screenStories(screenMap, finishStory);
+  const total =
+    level.type === "trace" ? Math.min(4, store.settings.rounds)
+    : level.type === "memory" ? 3
+    : store.settings.rounds;
   const go = () => runSession({
     title: level.title,
     icon: level.icon,
@@ -208,6 +216,24 @@ function finishLevel(level, r) {
     primary: next && isUnlocked(next) ? { label: `المستوى التالي ${next.icon}`, run: () => startLevel(next) } : null,
     again: () => startLevel(level),
     extra: level.type === "letters" ? { label: "📚 راجع الدرس", run: () => showLesson(level, () => startLevel(level), screenMap) } : null
+  });
+}
+
+function finishStory(st, r) {
+  const stars = starsFor(r.mistakes, r.total);
+  const { before, after } = store.finishLevel("story-" + st.id, stars);
+  store.finishLevel("stories", stars);
+  const stickers = [];
+  if (before === 0 && after > 0) stickers.push(store.awardSticker());
+  if (before < 3 && after === 3) stickers.push(store.awardSticker());
+  showResult({
+    stars,
+    r,
+    stickers: stickers.filter(Boolean),
+    certs: checkCertificates(),
+    title: stars === 3 ? "فهمت القصة تماماً! 📚" : "أحسنت القراءة! 👏",
+    primary: { label: "📚 قصة أخرى", run: () => screenStories(screenMap, finishStory) },
+    again: () => screenStories(screenMap, finishStory)
   });
 }
 
