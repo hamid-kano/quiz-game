@@ -30,5 +30,4 @@ npx serve .
 حيث `a` رقم الإجابة الصحيحة بدءاً من 0.
 
 ## النشر التلقائي
-كل دفع (push) إلى فرع `main` ينشر اللعبة تلقائياً على GitHub Pages عبر
-`.github/workflows/deploy.yml`.
+كل دفع (push) إلى فرع `main` ينشر اللعبة تلقائياً على GitHub Pages (النشر من الفرع `main`).
