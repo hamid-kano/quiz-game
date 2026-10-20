@@ -120,6 +120,7 @@
     return save.age === "small" ? LEVELS.filter((l) => l.age === "small") : LEVELS;
   }
   function isUnlocked(level) {
+    if (typeof LOCK_LEVELS !== "undefined" && !LOCK_LEVELS) return true;
     const list = visibleLevels();
     const i = list.indexOf(level);
     if (i <= 0) return true;

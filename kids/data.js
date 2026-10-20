@@ -1,4 +1,10 @@
 // بيانات تطبيق حروفي
+
+// إعدادات عامة
+// LOCK_LEVELS = false: كل المستويات مفتوحة (أثناء التطوير والتجربة)
+// LOCK_LEVELS = true : يجب إنهاء كل مستوى لفتح الذي بعده
+const LOCK_LEVELS = false;
+
 // c: يتصل بما بعده؟ (false للحروف التي لا تتصل بما بعدها)
 const LETTERS = [
   { l: "أ", name: "ألف", word: "أرنب", emoji: "🐰", c: false },
