@@ -420,3 +420,16 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .plot.wiggle { animation: wiggle .5s; }
 .garden-legend { justify-content: center; }
 .quick { grid-template-columns: repeat(4, 1fr); }
+
+/* شاشات قصيرة: تصغير الصور حتى تظهر الأزرار بدون تمرير */
+@media (max-height: 720px) {
+  .prompt { padding: 10px 12px; margin-bottom: 12px; }
+  .prompt .pic, .story-pic { font-size: 60px; }
+  .prompt .big { font-size: 66px; }
+  .built-word { font-size: 36px; min-height: 48px; }
+  .slot { width: 46px; height: 54px; font-size: 28px; }
+  .tile { width: 60px; height: 64px; font-size: 32px; }
+  .choice { min-height: 88px; font-size: 48px; }
+  .choice.emoji { font-size: 44px; }
+  .mascot { font-size: 70px; }
+}
