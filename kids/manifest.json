@@ -1,16 +1,21 @@
 {
   "name": "حروفي - تعلّم العربية",
   "short_name": "حروفي",
-  "description": "تطبيق تعليمي للأطفال لتعلّم الحروف والكلمات العربية باللعب",
+  "description": "تطبيق تعليمي للأطفال لتعلّم الحروف والكلمات العربية باللعب، يعمل بدون إنترنت",
   "lang": "ar",
   "dir": "rtl",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#8ecae6",
   "theme_color": "#ffb703",
+  "categories": ["education", "kids"],
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
