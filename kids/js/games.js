@@ -1,208 +1,13 @@
 // ============================================================
 //  الأنشطة: مولّدات الأسئلة + طريقة عرض كل نوع + مشغّل الجلسة
 // ============================================================
-import {
-  LETTERS, SIMILAR_GROUPS, WORDS_SHORT, WORDS_LONG, ALL_WORDS, HARAKAT,
-  NUMBERS, COUNT_EMOJIS, SENTENCES
-} from "./data.js";
+import { LETTERS } from "./data.js";
 import { store } from "./store.js";
-import { speak, stopSpeech, sfx, hasArabicVoice } from "./sfx.js";
-import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms } from "./util.js";
+import { speak, stopSpeech, sfx } from "./sfx.js";
+import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
-const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
-const optionCount = () => (store.active.age === "small" ? 3 : 4);
-const TATWEEL = "ـ";
 
-// ------------------------------------------------------------
-//  المولّدات: كل مولّد يعيد "سؤالاً" جاهزاً للعرض
-// ------------------------------------------------------------
-function letterChoices(target, pool, n = optionCount()) {
-  // نفضّل أحياناً حرفاً مشابهاً كمشتّت لأن الخلط بينها هو الأصعب
-  const group = SIMILAR_GROUPS.find((g) => g.includes(target.l)) || [];
-  const similar = pool.filter((x) => x !== target && group.includes(x.l));
-  const others = pool.filter((x) => x !== target && !group.includes(x.l));
-  const distract = [...pick(similar, Math.random() < 0.6 ? 1 : 0), ...pick(others, n)].slice(0, n - 1);
-  return shuffle([target, ...distract]);
-}
-
-export const GEN = {
-  letters(level) {
-    const pool = LETTERS.slice(...level.range);
-    const [target] = store.pickWeighted(pool, (L) => "rec:" + L.l);
-    return {
-      kind: "choice",
-      key: "rec:" + target.l,
-      target: target.l,
-      promptHtml: `<div class="q">أين حرف <b>${target.name}</b>؟</div><div class="pic">${target.emoji}</div>`,
-      say: `أين حرف ${target.name}؟`,
-      options: letterChoices(target, pool).map((L) => ({ id: L.l, html: L.l, right: L === target })),
-      praise: `أحسنت! ${target.name}`
-    };
-  },
-
-  similar() {
-    const groupLetters = SIMILAR_GROUPS.flat().map((l) => byLetter[l]);
-    const [target] = store.pickWeighted(groupLetters, (L) => "rec:" + L.l);
-    const group = SIMILAR_GROUPS.find((g) => g.includes(target.l)).map((l) => byLetter[l]);
-    const opts = shuffle([target, ...pick(group.filter((x) => x !== target), optionCount() - 1)]);
-    return {
-      kind: "choice",
-      key: "rec:" + target.l,
-      target: target.l,
-      promptHtml: `<div class="q">انتبه للنقاط! أين حرف <b>${target.name}</b>؟</div><div class="pic">${target.emoji}</div>`,
-      say: `أين حرف ${target.name}؟`,
-      options: opts.map((L) => ({ id: L.l, html: L.l, right: L === target })),
-      praise: `ممتاز! ${target.name}`
-    };
-  },
-
-  first() {
-    const [target] = store.pickWeighted(LETTERS, (L) => "snd:" + L.l);
-    return {
-      kind: "choice",
-      key: "snd:" + target.l,
-      target: target.l,
-      promptHtml: `<div class="q">بأي حرف تبدأ هذه الكلمة؟</div><div class="pic">${target.emoji}</div><div class="hint-word">${target.word}</div>`,
-      say: target.word,
-      options: letterChoices(target, LETTERS).map((L) => ({ id: L.l, html: L.l, right: L === target })),
-      praise: `${target.word} تبدأ بحرف ${target.name}`
-    };
-  },
-
-  harakat() {
-    const target = randomOf(store.pickWeighted(HARAKAT, (h) => "hk:" + h.id, 1));
-    const L = randomOf(LETTERS);
-    const make = (hk) => (L.l === "أ" ? (hk.id === "i" ? "إ" : "أ") + hk.mark : L.l + hk.mark);
-    return {
-      kind: "choice",
-      key: "hk:" + target.id,
-      target: target.id,
-      promptHtml: `<div class="q">اختر حرف <b>${L.name}</b> مع <b>${target.name}</b></div>`,
-      say: make(target),
-      options: shuffle(HARAKAT).map((h) => ({ id: h.id, html: make(h), right: h === target })),
-      cols: 3
-    };
-  },
-
-  forms() {
-    const pool = LETTERS.filter((L) => L.c);
-    const [target] = store.pickWeighted(pool, (L) => "frm:" + L.l);
-    const [label, shape] = randomOf(letterForms(target).slice(1));
-    return {
-      kind: "choice",
-      key: "frm:" + target.l,
-      target: target.l,
-      promptHtml: `<div class="q">هذا الحرف في <b>${label}</b> الكلمة، ما هو؟</div><div class="big">${shape}</div>`,
-      say: "ما هذا الحرف؟",
-      options: letterChoices(target, LETTERS).map((L) => ({ id: L.l, html: L.l, right: L === target })),
-      praise: `أحسنت! حرف ${target.name}`
-    };
-  },
-
-  position() {
-    // كل (كلمة، حرف يظهر فيها مرة واحدة)
-    const items = [];
-    for (const w of ALL_WORDS) {
-      const chars = [...w.w];
-      chars.forEach((ch, i) => {
-        if (!byLetter[ch] || chars.filter((c) => c === ch).length !== 1) return;
-        const pos = i === 0 ? "first" : i === chars.length - 1 ? "last" : "mid";
-        items.push({ w, ch, pos });
-      });
-    }
-    const [t] = store.pickWeighted(items, (x) => `pos:${x.w.w}:${x.ch}`);
-    const names = { first: "أول الكلمة", mid: "وسط الكلمة", last: "آخر الكلمة" };
-    const L = byLetter[t.ch];
-    return {
-      kind: "choice",
-      key: `pos:${t.w.w}:${t.ch}`,
-      target: t.pos,
-      promptHtml: `<div class="q">أين حرف <b>${L.name}</b> في كلمة:</div><div class="pic small-pic">${t.w.emoji}</div><div class="big">${t.w.w}</div>`,
-      say: `أين حرف ${L.name} في كلمة ${t.w.w}؟`,
-      options: ["first", "mid", "last"].map((p) => ({ id: p, html: names[p], right: p === t.pos, text: true })),
-      cols: 3
-    };
-  },
-
-  read() {
-    const [target] = store.pickWeighted(ALL_WORDS, (w) => "w:" + w.w);
-    const others = pick(ALL_WORDS.filter((x) => x.emoji !== target.emoji), optionCount() - 1);
-    return {
-      kind: "choice",
-      key: "w:" + target.w,
-      target: target.w,
-      promptHtml: `<div class="q">اقرأ الكلمة واختر صورتها</div><div class="big">${target.w}</div>`,
-      say: null,
-      options: shuffle([target, ...others]).map((w) => ({ id: w.w, html: w.emoji, right: w === target, emoji: true })),
-      praise: target.w
-    };
-  },
-
-  sentences() {
-    const [target] = store.pickWeighted(SENTENCES, (s) => "s:" + s.s);
-    const others = pick(SENTENCES.filter((x) => x !== target), 3);
-    return {
-      kind: "choice",
-      key: "s:" + target.s,
-      target: target.s,
-      promptHtml: `<div class="q">اقرأ الجملة واختر الصورة المناسبة</div><div class="sentence">${target.s}</div>`,
-      say: null,
-      options: shuffle([target, ...others]).map((s) => ({ id: s.s, html: s.pic, right: s === target, emoji: true })),
-      praise: target.s
-    };
-  },
-
-  numbers() {
-    const max = store.active.age === "small" ? 5 : 10;
-    const pool = NUMBERS.slice(0, Math.max(max, 5));
-    const [target] = store.pickWeighted(pool, (n) => "n:" + n.n);
-    const e = randomOf(COUNT_EMOJIS);
-    const others = pick(pool.filter((x) => x !== target), optionCount() - 1);
-    return {
-      kind: "choice",
-      key: "n:" + target.n,
-      target: String(target.n),
-      promptHtml: `<div class="q">عُدّ، كم عددها؟</div><div class="count-box">${Array(target.n).fill(`<span>${e}</span>`).join("")}</div>`,
-      say: "كم عددها؟",
-      options: shuffle([target, ...others]).map((n) => ({ id: String(n.n), html: `${n.d}<small>${n.n}</small>`, right: n === target, num: true })),
-      praise: `${target.name}! أحسنت`
-    };
-  },
-
-  listen() {
-    const pool = WORDS_SHORT.concat(WORDS_LONG.slice(0, 8));
-    const [target] = store.pickWeighted(pool, (w) => "lis:" + w.w);
-    const others = pick(pool.filter((x) => x.emoji !== target.emoji), optionCount() - 1);
-    // بدون صوت عربي نعرض الكلمة مكتوبة حتى لا يعلق الطفل
-    const canHear = store.settings.speech && hasArabicVoice();
-    return {
-      kind: "choice",
-      key: "lis:" + target.w,
-      target: target.w,
-      promptHtml: `<div class="q">اسمع الكلمة واختر صورتها</div><div class="ear">👂</div>${canHear ? "" : `<div class="big">${target.w}</div>`}`,
-      say: target.w,
-      options: shuffle([target, ...others]).map((w) => ({ id: w.w, html: w.emoji, right: w === target, emoji: true })),
-      praise: target.w
-    };
-  },
-
-  memory() {
-    const pairs = store.active.age === "small" ? 3 : 4;
-    const letters = store.pickWeighted(LETTERS, (L) => "snd:" + L.l, pairs);
-    return { kind: "memory", key: "mem:" + letters.map((L) => L.l).join(""), letters };
-  },
-
-  build(level) {
-    const pool = level?.words === "long" ? WORDS_LONG : WORDS_SHORT;
-    const [target] = store.pickWeighted(pool, (w) => "w:" + w.w);
-    return { kind: "build", key: "w:" + target.w, word: target };
-  },
-
-  trace() {
-    const [target] = store.pickWeighted(LETTERS, (L) => "trc:" + L.l);
-    return { kind: "trace", key: "trc:" + target.l, letter: target };
-  }
-};
+export { GEN } from "./exercises.js";
 
 // ------------------------------------------------------------
 //  مشغّل الجلسة
@@ -255,6 +60,8 @@ export function runSession(opt) {
     s.seen.add(q.key);
     if (q.kind === "build") buildRound(s, q);
     else if (q.kind === "memory") memoryRound(s, q);
+    else if (q.kind === "hunt") huntRound(s, q);
+    else if (q.kind === "order") orderRound(s, q);
     else if (q.kind === "trace") traceRound(s, q);
     else choiceRound(s, q);
   }
@@ -289,14 +96,14 @@ function bindCommon(s, sayText) {
 
 // ---------- سؤال اختيار ----------
 function choiceRound(s, q) {
-  const cols = q.cols === 3 || q.options.length === 3 ? "three" : q.options.length === 2 ? "two" : "";
+  const cols = q.wide ? "one" : q.cols === 3 || q.options.length === 3 ? "three" : q.options.length === 2 ? "two" : "";
   render(`
     ${header(s)}
     <div class="prompt">${q.promptHtml}
       ${q.say ? `<div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>` : ""}
     </div>
     <div class="choices ${cols}">
-      ${q.options.map((o, i) => `<button class="choice ${o.emoji ? "emoji" : ""} ${o.text ? "text" : ""} ${o.num ? "num" : ""}" data-i="${i}">${o.html}</button>`).join("")}
+      ${q.options.map((o, i) => `<button class="choice ${o.emoji ? "emoji" : ""} ${o.text ? "text" : ""} ${o.num ? "num" : ""} ${o.word ? "word" : ""} ${o.sentence ? "sentence-opt" : ""}" data-i="${i}">${o.html}</button>`).join("")}
     </div>
   `);
   bindCommon(s, q.say);
@@ -320,25 +127,26 @@ function choiceRound(s, q) {
 }
 
 // ---------- لعبة الذاكرة ----------
+// q.pairs = [{ a: {face, cls, say}, b: {face, cls, say}, done, rec }]
 function memoryRound(s, q) {
-  const cards = shuffle(q.letters.flatMap((L) => [
-    { L, face: L.l, kind: "letter" },
-    { L, face: L.emoji, kind: "pic" }
+  const cards = shuffle(q.pairs.flatMap((p, idx) => [
+    { idx, side: "a", ...p.a },
+    { idx, side: "b", ...p.b }
   ]));
   let open = [];
   let matched = 0;
   let misses = 0;
   let busy = false;
-  const missedLetters = new Set();
+  const missed = new Set();
 
   render(`
     ${header(s)}
-    <div class="prompt compact"><div class="q">اقلب بطاقتين: طابق كل حرف مع صورة تبدأ به</div></div>
+    <div class="prompt compact"><div class="q">اقلب بطاقتين: ${q.title}</div></div>
     <div class="memory ${cards.length > 6 ? "four" : ""}">
       ${cards.map((c, i) => `
         <button class="mcard" data-i="${i}" aria-label="بطاقة">
           <span class="mback">❓</span>
-          <span class="mface ${c.kind}">${c.face}</span>
+          <span class="mface ${c.cls}">${c.face}</span>
         </button>`).join("")}
     </div>
   `);
@@ -350,38 +158,122 @@ function memoryRound(s, q) {
     if (busy || el.classList.contains("open") || el.classList.contains("done")) return;
     sfx.tap();
     el.classList.add("open");
-    const c = cards[i];
-    speak(c.kind === "letter" ? c.L.name : c.L.word);
+    speak(cards[i].say);
     open.push(i);
     if (open.length < 2) return;
 
     const [a, b] = open.map((k) => cards[k]);
-    open.forEach((k) => els[k].classList.add("checking"));
     busy = true;
-    if (a.L === b.L && a.kind !== b.kind) {
+    if (a.idx === b.idx && a.side !== b.side) {
       setTimeout(() => {
-        open.forEach((k) => { els[k].classList.remove("checking"); els[k].classList.add("done"); });
+        open.forEach((k) => els[k].classList.add("done"));
         open = [];
         busy = false;
         matched++;
         sfx.right();
-        speak(`${a.L.word} تبدأ بحرف ${a.L.name}`);
-        store.record("snd:" + a.L.l, !missedLetters.has(a.L.l));
-        if (matched === q.letters.length) {
+        const p = q.pairs[a.idx];
+        speak(p.done);
+        if (p.rec) store.record(p.rec, !missed.has(a.idx));
+        if (matched === q.pairs.length) {
           // في لعبة الذاكرة بعض الأخطاء طبيعية، نحتسب الخطأ فقط إذا زاد عن عدد الأزواج
-          if (misses > q.letters.length) s.missed = true, s.mistakes++;
+          if (misses > q.pairs.length) { s.missed = true; s.mistakes++; }
           s.right({ key: q.key }, 1300);
         }
       }, 450);
     } else {
       misses++;
-      if (a.L !== b.L) { missedLetters.add(a.L.l); missedLetters.add(b.L.l); }
+      missed.add(a.idx);
+      missed.add(b.idx);
       setTimeout(() => {
         sfx.wrong();
-        open.forEach((k) => els[k].classList.remove("open", "checking"));
+        open.forEach((k) => els[k].classList.remove("open"));
         open = [];
         busy = false;
       }, 950);
+    }
+  }));
+}
+
+// ---------- صيد الحرف: اضغط كل كلمة فيها الحرف ----------
+function huntRound(s, q) {
+  const L = q.letter;
+  const words = q.text.split(" ");
+  const targets = words.map((w) => w.includes(L.l));
+  const need = targets.filter(Boolean).length;
+  let found = 0;
+  let wrongCount = 0;
+
+  render(`
+    ${header(s)}
+    <div class="prompt">
+      <div class="q">اضغط على كل كلمة فيها حرف <b>${L.name}</b></div>
+      <div class="big small-big">${L.l}</div>
+      <div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>
+    </div>
+    <div class="hunt">${words.map((w, i) => `<button class="hword" data-i="${i}">${esc(w)}</button>`).join("")}</div>
+    <p class="sub hunt-count" id="count"></p>
+  `);
+  bindCommon(s, `اضغط على كل كلمة فيها حرف ${L.name}`);
+  const count = () => { $("#count").textContent = `وجدت ${toArabicDigits(found)} من ${toArabicDigits(need)}`; };
+  count();
+
+  $$(".hword").forEach((btn) => (btn.onclick = () => {
+    const i = Number(btn.dataset.i);
+    if (btn.classList.contains("got")) return;
+    if (targets[i]) {
+      btn.classList.add("got");
+      btn.disabled = true;
+      sfx.tap();
+      speak(words[i].replace(/[.،!؟:]/g, ""));
+      found++;
+      count();
+      if (found === need) {
+        $$(".hword").forEach((b) => (b.disabled = true));
+        s.right(q, 1200);
+      }
+    } else {
+      btn.classList.remove("wrong"); void btn.offsetWidth; btn.classList.add("wrong");
+      s.wrong(null, null);
+      if (++wrongCount >= 2) $$(".hword").forEach((b, k) => targets[k] && !b.classList.contains("got") && b.classList.add("hint"));
+    }
+  }));
+}
+
+// ---------- رتّب الجمل كما حدثت في القصة ----------
+function orderRound(s, q) {
+  const items = shuffle(q.pages.map((p, k) => ({ ...p, k })));
+  let next = 0;
+  let wrongCount = 0;
+
+  render(`
+    ${header(s)}
+    <div class="prompt compact">
+      <div class="q">${q.story.cover} من قصة «${esc(q.story.title)}»</div>
+      <div class="q">رتّب الجمل: اضغط الأولى ثم التي بعدها</div>
+    </div>
+    <div class="order">
+      ${items.map((it, i) => `<button class="oitem" data-i="${i}"><span class="onum"></span><span class="opic">${it.pic}</span><span class="otext">${esc(it.text)}</span></button>`).join("")}
+    </div>
+  `);
+  bindCommon(s, null);
+
+  const els = $$(".oitem");
+  els.forEach((btn) => (btn.onclick = () => {
+    const it = items[Number(btn.dataset.i)];
+    if (btn.classList.contains("placed")) return;
+    if (it.k === next) {
+      next++;
+      wrongCount = 0;
+      btn.classList.add("placed");
+      btn.querySelector(".onum").textContent = String(next).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+      els.forEach((b) => b.classList.remove("hint"));
+      sfx.tap();
+      speak(it.text);
+      if (next === q.pages.length) { els.forEach((b) => (b.disabled = true)); s.right(q, 1600); }
+    } else {
+      btn.classList.remove("wrong"); void btn.offsetWidth; btn.classList.add("wrong");
+      s.wrong(null, null);
+      if (++wrongCount >= 2) els[items.findIndex((x) => x.k === next)].classList.add("hint");
     }
   }));
 }
@@ -445,8 +337,8 @@ function traceRound(s, q) {
   render(`
     ${header(s)}
     <div class="prompt compact">
-      <div class="q">ارسم حرف <b>${L.name}</b> فوق الخط الرمادي</div>
-      <div class="say-row"><button class="speak" id="say">🔊 حرف ${L.name}</button></div>
+      <div class="q">ارسم ${L.num ? "رقم" : "حرف"} <b>${L.name}</b> فوق الخط الرمادي</div>
+      <div class="say-row"><button class="speak" id="say">🔊 ${L.num ? "رقم" : "حرف"} ${L.name}</button></div>
     </div>
     <div class="trace-wrap" id="wrap">
       <canvas id="guide"></canvas>
@@ -457,7 +349,7 @@ function traceRound(s, q) {
       <button class="btn small" id="check">✔ تحقّق</button>
     </div>
   `);
-  bindCommon(s, `حرف ${L.name}`);
+  bindCommon(s, `${L.num ? "رقم" : "حرف"} ${L.name}`);
 
   const wrap = $("#wrap");
   const guide = $("#guide");

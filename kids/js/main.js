@@ -6,6 +6,7 @@ import { store } from "./store.js";
 import { speak, sfx, confetti } from "./sfx.js";
 import { render, $, $$, esc, toast, randomOf, plural } from "./util.js";
 import { GEN, runSession, showLesson } from "./games.js";
+import { DAILY_TYPES } from "./exercises.js";
 import { screenParents } from "./parents.js";
 import { CERTIFICATES, checkCertificates, screenCertificate } from "./rewards.js";
 import { screenStories } from "./stories.js";
@@ -183,6 +184,7 @@ export function startLevel(level) {
   const total =
     level.type === "trace" ? Math.min(4, store.settings.rounds)
     : level.type === "memory" ? 3
+    : level.type === "order" ? Math.min(4, store.settings.rounds)
     : store.settings.rounds;
   const go = () => runSession({
     title: level.title,
@@ -267,10 +269,6 @@ function showResult({ stars, r, stickers, certs, title, primary, again, extra, n
 }
 
 // ---------- التحدي اليومي ----------
-const DAILY_TYPES = {
-  small: ["letters", "similar", "first", "numbers"],
-  big: ["letters", "similar", "first", "harakat", "forms", "position", "read", "sentences"]
-};
 const ALL_LETTERS_LEVEL = { range: [0, LETTERS.length] };
 
 function startDaily() {
