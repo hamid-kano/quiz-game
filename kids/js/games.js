@@ -4,7 +4,7 @@
 import { LETTERS } from "./data.js";
 import { store } from "./store.js";
 import { speak, stopSpeech, speechDone, sfx, canHear, praiseText } from "./sfx.js";
-import { scoreTrace, frameOf } from "./tracecheck.js";
+import { scoreTrace, frameOf, letterGuide, checkOrder, letterLayers } from "./tracecheck.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
 
@@ -471,15 +471,18 @@ function traceRound(s, q) {
   let guideMode = q.guide || "full";
   let free = guideMode !== "full";
   let failed = 0;
+  let orderWarned = false;
   const kind = q.text ? "الكلمة" : L.num ? "رقم" : "حرف";
   const title = q.title || (guideMode === "none" ? `اكتب ${kind} <b>${esc(L.name || text)}</b> بنفسك` : guideMode === "memory" ? `انظر جيداً ثم اكتب ${kind} <b>${esc(L.name || text)}</b> من ذاكرتك` : `ارسم ${kind} <b>${esc(L.name || text)}</b> فوق الخط الرمادي`);
   const sayText = q.say || (q.text ? text : `${L.num ? "رقم" : "حرف"} ${L.name}`);
+  // حرف مفرد (لا كلمة ولا رقم ولا شكل داخل كلمة): نعلّم اتجاه كتابته وترتيبها
+  const isLetter = !q.text && !L.num && !!L.l;
   render(`
     ${header(s)}
     <div class="prompt compact">
       <div class="q">${title}</div>
       ${q.pic ? `<div class="pic small-pic">${q.pic}</div>` : ""}
-      <div class="say-row"><button class="speak" id="say">🔊 استمع</button>${guideMode === "memory" ? ` <button class="speak alt" id="peek">👀 أرني مرة أخرى</button>` : ""}</div>
+      <div class="say-row"><button class="speak" id="say">🔊 استمع</button>${guideMode === "memory" ? ` <button class="speak alt" id="peek">👀 أرني مرة أخرى</button>` : ""}${isLetter && guideMode === "full" ? ` <button class="speak alt" id="demo">▶ كيف يُكتب؟</button>` : ""}</div>
       ${parentNote(sayText)}
     </div>
     <div class="trace-wrap ${guideMode === "none" ? "lined" : ""}" id="wrap">
@@ -557,7 +560,66 @@ function traceRound(s, q) {
       gctx.setLineDash([]);
     }
     paintFrame();
+    if (show && isLetter && guideMode === "full" && !demoRunning) drawMarkers();
   };
+
+  // ---- اتجاه الكتابة: نقطة البداية الخضراء والسهم، ورقم ٢ عند النقاط ----
+  const lg = isLetter ? letterGuide(text) : null;
+  let demoRunning = false;
+  function drawMarkers() {
+    if (!lg) return;
+    const x = lg.start.x * size, y = lg.start.y * size;
+    gctx.save();
+    gctx.fillStyle = "#2bb673";
+    gctx.beginPath(); gctx.arc(x, y, 13, 0, Math.PI * 2); gctx.fill();
+    gctx.fillStyle = "#fff";
+    gctx.font = '900 15px "Cairo", sans-serif';
+    gctx.textAlign = "center"; gctx.textBaseline = "middle";
+    gctx.fillText("١", x, y + 1);
+    gctx.fillStyle = "#2bb673";
+    gctx.font = '900 28px "Cairo", sans-serif';
+    if (lg.vertical) gctx.fillText("↓", x + 26, y + 18);
+    else gctx.fillText("←", x - 6, y - 24);
+    lg.dots.forEach((d) => {
+      gctx.fillStyle = "#ffb703";
+      gctx.beginPath(); gctx.arc(d.x * size + 20, d.y * size - 16, 10, 0, Math.PI * 2); gctx.fill();
+      gctx.fillStyle = "#12355b";
+      gctx.font = '900 12px "Cairo", sans-serif';
+      gctx.fillText("٢", d.x * size + 20, d.y * size - 15);
+    });
+    gctx.restore();
+  }
+  // عرض متحرك: يُرسم الجسم من نقطة البداية في اتجاه الكتابة، ثم النقاط
+  function playDemo() {
+    if (!lg || demoRunning) return;
+    demoRunning = true;
+    const { body, dots } = letterLayers(text, size, dpr, "#8e7dff");
+    const t0 = performance.now();
+    const BODY = 1700, DOTS = 600;
+    const b = lg.box;
+    const step = (now) => {
+      if (s.answered || !document.body.contains(guide)) { demoRunning = false; return; }
+      const t = now - t0;
+      gctx.clearRect(0, 0, size, size);
+      drawText(gctx, size, "#eef3f7");
+      const pb = Math.min(1, t / BODY);
+      gctx.save();
+      gctx.beginPath();
+      if (lg.vertical) gctx.rect(0, 0, size, (b.y0 + (b.y1 - b.y0) * pb) * size + 2);
+      else { const xr = (b.x1 - (b.x1 - b.x0) * pb) * size - 2; gctx.rect(xr, 0, size - xr, size); }
+      gctx.clip();
+      gctx.drawImage(body, 0, 0, size, size);
+      gctx.restore();
+      if (t > BODY) { gctx.globalAlpha = Math.min(1, (t - BODY) / DOTS); gctx.drawImage(dots, 0, 0, size, size); gctx.globalAlpha = 1; }
+      // قلم يتبع مقدّمة الرسم
+      const px = lg.vertical ? lg.start.x * size : (b.x1 - (b.x1 - b.x0) * pb) * size;
+      const py = lg.vertical ? (b.y0 + (b.y1 - b.y0) * pb) * size : (lg.start.y + (b.y1 - lg.start.y) * Math.sin(pb * Math.PI) * 0.5) * size;
+      if (t <= BODY) { gctx.font = "30px serif"; gctx.textAlign = "center"; gctx.textBaseline = "middle"; gctx.fillText("✏️", px - 4, py - 18); }
+      if (t < BODY + DOTS + 400) requestAnimationFrame(step);
+      else { demoRunning = false; paintGuide(guideVisible); }
+    };
+    requestAnimationFrame(step);
+  }
   let guideVisible = guideMode !== "none";
   let hideTimer = null;
   const showGuide = () => {
@@ -568,7 +630,13 @@ function traceRound(s, q) {
     }
   };
   if (guideVisible) showGuide(); else paintGuide(false);
-  document.fonts?.load(font(40), text).then(() => paintGuide(guideVisible)).catch(() => {});
+  document.fonts?.load(font(40), text).then(() => {
+    paintGuide(guideVisible);
+    // للصغار، أو لحرف لم يتقنه الطفل بعد: نعرض طريقة كتابته مرة عند البداية
+    const m = store.active.mastery["trc:" + text];
+    if (isLetter && guideMode === "full" && (store.active.age === "small" || !m || m.box < 2)) setTimeout(playDemo, 600);
+  }).catch(() => {});
+  $("#demo")?.addEventListener("click", () => { sfx.tap(); playDemo(); });
   $("#peek")?.addEventListener("click", () => { guideVisible = true; showGuide(); });
 
   const strokes = [];
@@ -622,6 +690,20 @@ function traceRound(s, q) {
 
     const sc = scoreTrace(text, strokes, free, LW / size);
 
+    // الشكل صحيح لكن الترتيب أو الاتجاه خطأ: ننبّه مرة واحدة ونعرض الطريقة
+    if (sc.pass && isLetter && !orderWarned) {
+      const ord = checkOrder(text, strokes);
+      if (!ord.ok) {
+        orderWarned = true;
+        s.wrong(null, null);
+        toast(ord.reason === "dots" ? "اكتب الحرف أولاً، ثم النقاط ✏️" : "ابدأ من النقطة الخضراء واتّجه مع السهم ✏️");
+        speak(ord.reason === "dots" ? "اكتب الحرف أولاً، ثم النقاط" : "ابدأ من النقطة الخضراء");
+        strokes.length = 0;
+        repaint();
+        if (guideMode === "full") { paintGuide(true); setTimeout(playDemo, 400); }
+        return;
+      }
+    }
     if (sc.pass) {
       $("#check").disabled = true;
       $("#clear").disabled = true;

@@ -159,3 +159,133 @@ export function frameOf(text) {
   return { x: b.x0 / N - pad, y: b.y0 / N - pad, w: b.w / N + pad * 2, h: b.h / N + pad * 2 };
 }
 
+
+// ============================================================
+//  اتجاه الكتابة وترتيبها
+//  نحلّل شكل الحرف: الجسم الرئيسي (أكبر جزء) والنقاط (الأجزاء الصغيرة)،
+//  ونقطة البداية: أعلى اليمين للحروف الأفقية، والأعلى للحروف العمودية (ا، ل...)
+// ============================================================
+function components(m) {
+  const comp = new Int32Array(N * N).fill(-1);
+  const parts = [];
+  for (let i0 = 0; i0 < N * N; i0++) {
+    if (!m[i0] || comp[i0] >= 0) continue;
+    const id = parts.length;
+    const cells = [i0];
+    comp[i0] = id;
+    for (let k = 0; k < cells.length; k++) {
+      const i = cells[k], x = i % N, y = (i / N) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy, j = ny * N + nx;
+        if (nx >= 0 && ny >= 0 && nx < N && ny < N && m[j] && comp[j] < 0) { comp[j] = id; cells.push(j); }
+      }
+    }
+    parts.push(cells);
+  }
+  return { comp, parts };
+}
+
+const guideCache = new Map();
+
+export function letterGuide(text) {
+  if (guideCache.has(text)) return guideCache.get(text);
+  const core = textMask(text).data;
+  const { comp, parts } = components(core);
+  if (!parts.length) return null;
+  const bodyId = parts.reduce((b, p, i) => (p.length > parts[b].length ? i : b), 0);
+  const body = parts[bodyId];
+  const xs = body.map((i) => i % N), ys = body.map((i) => (i / N) | 0);
+  const box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  const w = box.x1 - box.x0 + 1, h = box.y1 - box.y0 + 1;
+  const vertical = h > w * 1.6;
+  let start;
+  if (vertical) {
+    const top = body.filter((i) => ((i / N) | 0) <= box.y0 + 2);
+    const sx = top.reduce((a, i) => a + (i % N), 0) / top.length;
+    start = { x: (sx + 0.5) / N, y: (box.y0 + 1) / N };
+  } else {
+    // أقصى اليمين، وأعلى نقطة فيه
+    const right = body.filter((i) => i % N >= box.x1 - 3);
+    const sy = Math.min(...right.map((i) => (i / N) | 0));
+    start = { x: (box.x1 - 1) / N, y: (sy + 1) / N };
+  }
+  // النقاط والعلامات الصغيرة = كل الأجزاء غير الجسم (نتجاهل الأجزاء الصغيرة جداً)
+  const dots = parts
+    .filter((p, i) => i !== bodyId && p.length >= 3)
+    .map((p) => ({ x: (p.reduce((a, i) => a + (i % N), 0) / p.length + 0.5) / N, y: (p.reduce((a, i) => a + ((i / N) | 0), 0) / p.length + 0.5) / N }));
+  const g = {
+    vertical, start, dots, hasDots: dots.length > 0, comp, bodyId,
+    box: { x0: box.x0 / N, x1: (box.x1 + 1) / N, y0: box.y0 / N, y1: (box.y1 + 1) / N }
+  };
+  guideCache.set(text, g);
+  return g;
+}
+
+const pathLen = (st) => st.reduce((a, p, i) => (i ? a + Math.hypot(p.x - st[i - 1].x, p.y - st[i - 1].y) : 0), 0);
+
+// يتحقق من ترتيب الكتابة: الجسم قبل النقاط، والبداية من الجهة الصحيحة
+export function checkOrder(text, strokes) {
+  const g = letterGuide(text);
+  if (!g || !strokes.length) return { ok: true };
+  const bw = g.box.x1 - g.box.x0, bh = g.box.y1 - g.box.y0;
+  const size = Math.max(bw, bh);
+  // أول خط قصير جداً وقريب من نقطة = بدأ بالنقاط
+  const first = strokes[0];
+  if (g.hasDots && pathLen(first) < size * 0.18) {
+    const p = first[0];
+    const nearDot = g.dots.some((d) => Math.hypot(d.x - p.x, d.y - p.y) < size * 0.25);
+    if (nearDot && strokes.length > 1) return { ok: false, reason: "dots" };
+  }
+  // الخط الرئيسي = الأطول
+  const main = strokes.reduce((a, s) => (pathLen(s) > pathLen(a) ? s : a), strokes[0]);
+  if (pathLen(main) < size * 0.3) return { ok: true };
+  const s0 = main[0], s1 = main[main.length - 1];
+  if (g.vertical) {
+    // يبدأ من الأعلى ويتجه للأسفل
+    if (s0.y > s1.y + bh * 0.15) return { ok: false, reason: "start" };
+  } else {
+    // يبدأ من اليمين: نقطة بداية الخط الرئيسي في يمين الحرف أكثر من نهايته
+    const relStart = (s0.x - g.box.x0) / bw;
+    if (relStart < 0.45 && s1.x > s0.x + bw * 0.25) return { ok: false, reason: "start" };
+  }
+  return { ok: true };
+}
+
+// طبقتا الحرف (الجسم والنقاط) بلون محدد، لرسم العرض المتحرك
+export function letterLayers(text, size, dpr, color) {
+  const W = Math.round(size * dpr);
+  const full = document.createElement("canvas");
+  full.width = full.height = W;
+  const fx = full.getContext("2d", { willReadFrequently: true });
+  fx.scale(dpr, dpr);
+  const pl = placeText(fx, size, text);
+  fx.fillStyle = color;
+  fx.fillText(text, pl.x, pl.y);
+  const g = letterGuide(text);
+  const body = document.createElement("canvas");
+  const dots = document.createElement("canvas");
+  body.width = body.height = dots.width = dots.height = W;
+  if (!g) { body.getContext("2d").drawImage(full, 0, 0); return { body, dots, g }; }
+  const src = fx.getImageData(0, 0, W, W);
+  const bImg = new ImageData(W, W), dImg = new ImageData(W, W);
+  const near = (gx, gy) => {
+    for (let r = 0; r <= 2; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const x = gx + dx, y = gy + dy;
+      if (x >= 0 && y >= 0 && x < N && y < N && g.comp[y * N + x] >= 0) return g.comp[y * N + x];
+    }
+    return g.bodyId;
+  };
+  for (let y = 0; y < W; y++) {
+    const gy = Math.floor((y / W) * N);
+    for (let x = 0; x < W; x++) {
+      const k = (y * W + x) * 4;
+      if (!src.data[k + 3]) continue;
+      const c = near(Math.floor((x / W) * N), gy);
+      const dst = c === g.bodyId ? bImg : dImg;
+      dst.data[k] = src.data[k]; dst.data[k + 1] = src.data[k + 1]; dst.data[k + 2] = src.data[k + 2]; dst.data[k + 3] = src.data[k + 3];
+    }
+  }
+  body.getContext("2d").putImageData(bImg, 0, 0);
+  dots.getContext("2d").putImageData(dImg, 0, 0);
+  return { body, dots, g };
+}
