@@ -691,8 +691,16 @@ export const GEN = {
   },
 
   // ---------------- الذاكرة ----------------
-  memory(level) {
-    const pairsCount = big() ? 4 : 3;
+  // الذاكرة: البطاقات تزداد مع كل جولة، ومن الجولة الثانية تُكشف كلها لحظات ليحفظ الطفل أماكنها
+  memory(level, round = 0) {
+    const sizes = big() ? [3, 4, 5, 6] : [2, 3, 3, 4];
+    const pairsCount = sizes[Math.min(round, sizes.length - 1)];
+    const preview = round >= 1 ? (big() ? 2200 : 3000) + pairsCount * 250 : 0;
+    const q = GEN._memory(level, pairsCount);
+    return { ...q, preview, key: q.key + ":" + round };
+  },
+
+  _memory(level, pairsCount) {
     const v = level?.mode || "pic";
     if (v === "num") {
       const nums = pick(NUMBERS.slice(0, 6), pairsCount);
@@ -718,6 +726,33 @@ export const GEN = {
       };
     }
     if (v === "word") {
+      const kind = variant({ pic: 3, vowel: 2, opp: 2 });
+      if (kind === "vowel") {
+        // الكلمة بلا تشكيل ↔ نفسها مشكولة
+        const strip = (x) => x.replace(/[\u064B-\u0652]/g, "");
+        const pool = shuffle(SPELL_WORDS.filter((w) => w.type !== "shadda"));
+        const seen = new Set();
+        const words = pool.filter((w) => { const k = strip(w.w); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, pairsCount);
+        return {
+          kind: "memory", key: "mem:v", title: "طابق الكلمة مع نفسها مشكولة",
+          pairs: words.map((w) => ({
+            a: { face: strip(w.w), cls: "word", say: w.w },
+            b: { face: w.w, cls: "word alt", say: w.w },
+            done: w.w, rec: "rv:" + w.w
+          }))
+        };
+      }
+      if (kind === "opp") {
+        const pairs = pick(OPPOSITES, Math.min(pairsCount, OPPOSITES.length));
+        return {
+          kind: "memory", key: "mem:o", title: "طابق كل كلمة مع ضدّها",
+          pairs: pairs.map(([a, b]) => ({
+            a: { face: `${a.w}<small>${a.e}</small>`, cls: "word", say: a.w },
+            b: { face: `${b.w}<small>${b.e}</small>`, cls: "word alt", say: b.w },
+            done: `${a.w} عكسها ${b.w}`, rec: "opp:" + a.w
+          }))
+        };
+      }
       const short = ALL_WORDS.filter((w) => w.w.length <= 4);
       const first = randomOf(short);
       const words = [first, ...distinctPics(short, first, pairsCount - 1)];

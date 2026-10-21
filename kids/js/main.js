@@ -210,7 +210,7 @@ export function startActivity(act) {
   if (act.type === "spellGuide") return screenSpellGuide(back, startActivity);
   const total =
     act.type === "trace" ? Math.min(4, store.settings.rounds)
-    : act.type === "memory" ? 3
+    : act.type === "memory" ? 4
     : act.type === "order" ? Math.min(4, store.settings.rounds)
     : act.type === "keyboard" || act.type === "anagram" ? Math.min(5, store.settings.rounds)
     : store.settings.rounds;
@@ -218,7 +218,7 @@ export function startActivity(act) {
     title: act.title,
     icon: act.icon,
     total,
-    next: () => GEN[act.type](act),
+    next: (i) => GEN[act.type](act, i),
     onExit: back,
     onFinish: (r) => finishActivity(act, r)
   });

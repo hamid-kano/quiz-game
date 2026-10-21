@@ -174,10 +174,11 @@ function memoryRound(s, q) {
   let busy = false;
   const missed = new Set();
 
+  const cols = cards.length === 4 ? "two" : cards.length <= 6 ? "" : "four";
   render(`
     ${header(s)}
-    <div class="prompt compact"><div class="q">اقلب بطاقتين: ${q.title}</div></div>
-    <div class="memory ${cards.length > 6 ? "four" : ""}">
+    <div class="prompt compact"><div class="q" id="mtitle">${q.preview ? "👀 احفظ أماكن البطاقات!" : `اقلب بطاقتين: ${q.title}`}</div></div>
+    <div class="memory ${cols} ${cards.length > 8 ? "many" : ""}">
       ${cards.map((c, i) => `
         <button class="mcard" data-i="${i}" aria-label="بطاقة">
           <span class="mback">❓</span>
@@ -188,6 +189,19 @@ function memoryRound(s, q) {
   $("#back").onclick = s.exit;
 
   const els = $$(".mcard");
+  // كشف كل البطاقات لحظات ثم قلبها
+  if (q.preview) {
+    busy = true;
+    els.forEach((el) => el.classList.add("open"));
+    const id = s.qid;
+    speak("احفظ أماكن البطاقات");
+    setTimeout(() => {
+      if (id !== s.qid) return;
+      els.forEach((el) => el.classList.remove("open"));
+      $("#mtitle").textContent = `اقلب بطاقتين: ${q.title}`;
+      busy = false;
+    }, q.preview);
+  }
   els.forEach((el) => (el.onclick = () => {
     const i = Number(el.dataset.i);
     if (busy || el.classList.contains("open") || el.classList.contains("done")) return;
