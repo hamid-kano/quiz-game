@@ -11,6 +11,7 @@ import { screenParents } from "./parents.js";
 import { CERTIFICATES, checkCertificates, screenCertificate } from "./rewards.js";
 import { screenStories } from "./stories.js";
 import { screenGarden } from "./garden.js";
+import { screenSpellGuide } from "./spellguide.js";
 
 // ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
 const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
@@ -188,8 +189,8 @@ export function screenSkill(skillId) {
         const s = p.stars[a.id] || 0;
         return `<button class="activity" data-id="${a.id}" style="--c:${sk.color}">
           <span class="num">${a.icon}</span>
-          <span class="info"><b>${a.title}</b><small>${a.desc}</small></span>
-          <span class="lstars">${a.type === "lesson" ? "📖" : starsText(s)}</span>
+          <span class="info"><b>${a.step ? `<span class="stepno">${toArabicDigits(a.step)}</span>` : ""}${a.title}</b><small>${a.desc}</small></span>
+          <span class="lstars">${a.type === "lesson" || a.type === "spellGuide" ? "📖" : starsText(s)}</span>
         </button>`;
       }).join("")}
     </div>
@@ -206,6 +207,7 @@ export function startActivity(act) {
   const back = () => screenSkill(act.skill);
   if (act.type === "stories") return screenStories(back, (st, r) => finishStory(st, r, act));
   if (act.type === "lesson") return screenBoard(act);
+  if (act.type === "spellGuide") return screenSpellGuide(back, startActivity);
   const total =
     act.type === "trace" ? Math.min(4, store.settings.rounds)
     : act.type === "memory" ? 3
@@ -236,7 +238,7 @@ function finishActivity(act, r) {
   const stars = starsFor(r.mistakes, r.total);
   const stickers = rewardsFor(act.id, stars);
   const sk = skillsFor().find((s) => s.id === act.skill);
-  const list = sk.activities.filter((a) => a.type !== "lesson");
+  const list = sk.activities.filter((a) => a.type !== "lesson" && a.type !== "spellGuide");
   const next = list[(list.findIndex((a) => a.id === act.id) + 1) % list.length];
   const pr = store.skillProgress(sk);
   showResult({
@@ -321,7 +323,7 @@ function startDaily() {
   const alreadyDone = store.dailyDoneToday();
   const playable = skillsFor().map((sk) => ({
     sk,
-    acts: sk.activities.filter((a) => !["lesson", "stories", "trace", "memory", "order"].includes(a.type))
+    acts: sk.activities.filter((a) => !["lesson", "spellGuide", "stories", "trace", "memory", "order"].includes(a.type))
   })).filter((x) => x.acts.length);
 
   // المهارة الأقل إتقاناً تحصل على فرصة أكبر

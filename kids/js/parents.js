@@ -78,7 +78,7 @@ const confText = (x) => byLetter[x.t]
 // ---------- التقرير ----------
 function screenReport(back) {
   const p = store.active;
-  const levels = activitiesFor(p).filter((a) => a.type !== "lesson");
+  const levels = activitiesFor(p).filter((a) => a.type !== "lesson" && a.type !== "spellGuide");
   const done = levels.filter((l) => p.stars[l.id]).length;
   const skills = skillsFor(p).map((sk) => ({ sk, pr: store.skillProgress(sk, p) }));
   const weakest = skills.filter((x) => x.pr.seen).sort((a, b) => a.pr.value - b.pr.value)[0];
@@ -161,7 +161,7 @@ function screenReport(back) {
       <table>
         <tr><th>النشاط</th><th>النجوم</th><th>مرات اللعب</th></tr>
         ${skills.map(({ sk }) => `<tr class="group-row"><th colspan="3">${sk.icon} ${sk.name}</th></tr>` +
-          sk.activities.filter((a) => a.type !== "lesson").map((l) => `<tr><td>${l.icon} ${l.title}</td><td>${"⭐".repeat(p.stars[l.id] || 0) || "—"}</td><td>${n(p.plays[l.id] || 0)}</td></tr>`).join("")).join("")}
+          sk.activities.filter((a) => a.type !== "lesson" && a.type !== "spellGuide").map((l) => `<tr><td>${l.icon} ${l.title}</td><td>${"⭐".repeat(p.stars[l.id] || 0) || "—"}</td><td>${n(p.plays[l.id] || 0)}</td></tr>`).join("")).join("")}
       </table>
 
       <h3>⚙️ الإعدادات</h3>

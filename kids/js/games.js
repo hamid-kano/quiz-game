@@ -308,52 +308,61 @@ function orderRound(s, q) {
 }
 
 // ---------- ركّب الكلمة ----------
+// q.word = { w, emoji }
+// اختياري: q.parts (مقاطع أو حروف بالترتيب)، q.extras (بطاقات مشتّتة)، q.title،
+// q.hidePic (للإملاء: تظهر الصورة بعد الإكمال فقط)، q.sayParts (نطق كل جزء عند وضعه)، q.slow، q.praise
 function buildRound(s, q) {
   const target = q.word;
-  const letters = [...target.w];
-  const extra = pick(LETTERS.map((x) => x.l).filter((l) => !letters.includes(l)), store.active.age === "big" ? 2 : 1);
-  const tiles = shuffle([...letters, ...extra]);
+  const parts = q.parts || [...target.w];
+  const syllables = !!q.parts && q.parts.some((x) => [...x].length > 1);
+  const extra = q.extras || pick(LETTERS.map((x) => x.l).filter((l) => !parts.includes(l)), store.active.age === "big" ? 2 : 1);
+  const tiles = shuffle([...parts, ...extra]);
   let pos = 0;
   let wrongCount = 0;
 
   render(`
     ${header(s)}
     <div class="prompt">
-      <div class="q">ركّب الكلمة</div>
-      <div class="pic">${target.emoji}</div>
+      <div class="q">${q.title || "ركّب الكلمة"}</div>
+      <div class="pic" id="pic">${q.hidePic ? "👂" : target.emoji}</div>
       <div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>
-      <div class="slots">${letters.map(() => `<div class="slot"></div>`).join("")}</div>
+      ${parentNote(target.w)}
+      <div class="slots ${syllables ? "syl" : ""}">${parts.map(() => `<div class="slot"></div>`).join("")}</div>
       <div class="built-word" id="built" aria-live="polite"></div>
     </div>
-    <div class="tiles">${tiles.map((t, i) => `<button class="tile" data-i="${i}">${t}</button>`).join("")}</div>
+    <div class="tiles ${syllables ? "syl" : ""}">${tiles.map((t, i) => `<button class="tile" data-i="${i}">${t}</button>`).join("")}</div>
   `);
-  bindCommon(s, target.w);
+  bindCommon(s, target.w, q.slow);
 
   const slots = $$(".slot");
   const tileEls = $$(".tile");
   tileEls.forEach((btn) => (btn.onclick = () => {
+    if (s.answered) return;
     const t = tiles[Number(btn.dataset.i)];
-    if (t === letters[pos]) {
+    if (t === parts[pos]) {
       sfx.tap();
+      if (q.sayParts) speak(t, { slow: true });
       btn.classList.add("used");
       slots[pos].textContent = t;
       slots[pos].classList.add("filled");
       pos++;
       wrongCount = 0;
       tileEls.forEach((b) => b.classList.remove("hint"));
-      $("#built").textContent = letters.slice(0, pos).join("");
-      if (pos === letters.length) {
+      $("#built").textContent = pos === parts.length ? target.w : parts.slice(0, pos).join("");
+      if (pos === parts.length) {
         tileEls.forEach((b) => (b.disabled = true));
-        speak(`أحسنت! ${target.w}`);
+        if (q.hidePic) $("#pic").textContent = target.emoji;
+        speak(q.praise || `أحسنت! ${target.w}`);
         s.right(q, 1300);
       }
     } else {
       btn.classList.remove("wrong");
       void btn.offsetWidth;
       btn.classList.add("wrong");
-      s.wrong(letters[pos], t);
+      if (q.sayParts) speak(t, { slow: true });
+      s.wrong(parts[pos], t);
       if (++wrongCount >= 2) {
-        const hintEl = tileEls.find((b, i) => tiles[i] === letters[pos] && !b.classList.contains("used"));
+        const hintEl = tileEls.find((b, i) => tiles[i] === parts[pos] && !b.classList.contains("used"));
         hintEl?.classList.add("hint");
       }
     }

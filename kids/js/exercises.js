@@ -5,7 +5,8 @@
 // ============================================================
 import {
   LETTERS, SIMILAR_GROUPS, WORDS_SHORT, WORDS_LONG, ALL_WORDS, LETTER_WORDS, HARAKAT,
-  NUMBERS, COUNT_EMOJIS, SENTENCES, STORIES, OPPOSITES, CATEGORIES, RIDDLES
+  NUMBERS, COUNT_EMOJIS, SENTENCES, STORIES, OPPOSITES, CATEGORIES, RIDDLES,
+  SPELL_WORDS, CLOSED_SYLLABLES, TANWEEN, SHAMS_LETTERS
 } from "./data.js";
 import { store } from "./store.js";
 import { shuffle, pick, randomOf, esc, letterForms, toArabicDigits } from "./util.js";
@@ -649,6 +650,312 @@ export const GEN = {
           done: `${w.w} تبدأ بحرف ${L.name}`, rec: "snd:" + L.l
         };
       })
+    };
+  },
+
+  // ---------------- التهجئة ----------------
+  spell(level) {
+    return SPELL_GEN[level.mode](level);
+  }
+};
+
+// ============================================================
+//  مولّدات قسم التهجئة
+// ============================================================
+const HK = Object.fromEntries(HARAKAT.map((h) => [h.id, h]));
+const SUKUN = "\u0652";
+const SHADDA = "\u0651";
+// حروف للمقاطع (نستبعد حروف المدّ حتى لا تختلط الأمثلة)
+const SYL_LETTERS = LETTERS.filter((L) => !["أ", "و", "ي"].includes(L.l));
+const withH = (L, h) => (L.l === "أ" ? (h.id === "i" ? "إ" : "أ") : L.l) + h.mark;
+const MADD = [
+  { id: "a", name: "بالألف", after: "ا", h: "a" },
+  { id: "u", name: "بالواو", after: "و", h: "u" },
+  { id: "i", name: "بالياء", after: "ي", h: "i" }
+];
+const maddOf = (L, m) => L.l + HK[m.h].mark + m.after;
+const sylOpt = (id, html, right) => ({ id, html, right });
+const isShams = (ch) => SHAMS_LETTERS.includes(ch);
+// يغيّر حركة مقطع ليصنع مقطعاً مشتّتاً قريباً منه
+function altSyllable(sy) {
+  const marks = ["\u064E", "\u064F", "\u0650"];
+  const m = [...sy].find((c) => marks.includes(c));
+  if (!m) return null;
+  const other = randomOf(marks.filter((x) => x !== m));
+  return sy.replace(m, other);
+}
+const wordsOf = (types) => SPELL_WORDS.filter((w) => !types || types.includes(w.type));
+
+const SPELL_GEN = {
+  // 1) الحركات القصيرة
+  short() {
+    const v = variant({ hear: [3, 2], byName: [2, 2], name: [0, 2] });
+    const [h] = store.pickWeighted(HARAKAT, (x) => "hs:" + x.id);
+    const L = randomOf(SYL_LETTERS);
+    if (v === "name") {
+      return {
+        kind: "choice", key: "hs:" + h.id, target: h.id, cols: 3,
+        promptHtml: `<div class="q">ما الحركة على هذا الحرف؟</div><div class="big">${withH(L, h)}</div>`,
+        say: withH(L, h),
+        options: shuffle(HARAKAT).map((x) => textOpt(x.id, x.name, x === h)),
+        praise: `${h.name}: ${withH(L, h)}`
+      };
+    }
+    return {
+      kind: "choice", key: "hs:" + h.id, target: h.id, cols: 3,
+      promptHtml: v === "hear"
+        ? `<div class="q">اسمع واختر المقطع</div><div class="ear">👂</div>`
+        : `<div class="q">اختر حرف <b>${L.name}</b> مع <b>${h.name}</b></div>`,
+      say: v === "hear" ? withH(L, h) : `حرف ${L.name} مع ${h.name}`, slow: v === "hear",
+      options: shuffle(HARAKAT).map((x) => sylOpt(x.id, withH(L, x), x === h)),
+      praise: withH(L, h)
+    };
+  },
+
+  // 2) المدود
+  madd() {
+    const v = variant({ shortLong: [3, 1], hear: [2, 2], byName: [1, 2] });
+    const L = randomOf(SYL_LETTERS);
+    const [m] = store.pickWeighted(MADD, (x) => "md:" + x.id);
+    const long = maddOf(L, m);
+    const short = withH(L, HK[m.h]);
+    if (v === "shortLong") {
+      const askLong = Math.random() < 0.6;
+      const ans = askLong ? long : short;
+      return {
+        kind: "choice", key: "md:" + m.id, target: ans, cols: 2,
+        promptHtml: `<div class="q">اسمع: هل الصوت قصير أم ممدود؟</div><div class="ear">👂</div>`,
+        say: ans, slow: true,
+        options: [sylOpt(short, `${short}<small>قصير</small>`, ans === short), sylOpt(long, `${long}<small>ممدود</small>`, ans === long)],
+        praise: ans
+      };
+    }
+    return {
+      kind: "choice", key: "md:" + m.id, target: m.id, cols: 3,
+      promptHtml: v === "hear"
+        ? `<div class="q">اسمع واختر المقطع الممدود</div><div class="ear">👂</div>`
+        : `<div class="q">اختر حرف <b>${L.name}</b> ممدوداً <b>${m.name}</b></div>`,
+      say: v === "hear" ? long : `حرف ${L.name} ممدود ${m.name}`, slow: v === "hear",
+      options: shuffle(MADD).map((x) => sylOpt(x.id, maddOf(L, x), x === m)),
+      praise: long
+    };
+  },
+
+  // 3) السكون
+  sukun() {
+    const v = variant({ mark: 2, hear: 3, closed: 2 });
+    if (v === "mark") {
+      const L = randomOf(SYL_LETTERS);
+      const opts = [...HARAKAT.map((h) => sylOpt(h.id, withH(L, h), false)), sylOpt("s", L.l + SUKUN, true)];
+      return {
+        kind: "choice", key: "sk:mark", target: "s",
+        promptHtml: `<div class="q">أين حرف <b>${L.name}</b> الساكن؟</div><div class="ooo-icon">⭕</div>`,
+        say: `أين حرف ${L.name} الساكن؟`,
+        options: shuffle(opts),
+        praise: `${L.l + SUKUN}، ساكن`
+      };
+    }
+    const [w] = store.pickWeighted(CLOSED_SYLLABLES, (x) => "sk:" + x);
+    const variants = ["\u064E", "\u064F", "\u0650"].map((mk) => w.replace(/[\u064E\u064F\u0650]/, mk));
+    const all = [...new Set(variants)];
+    if (v === "closed") {
+      // نفس الحروف، مرة بسكون ومرة بحركة على الحرف الأخير
+      const open = w.replace(SUKUN, "\u064E");
+      return {
+        kind: "choice", key: "sk:" + w, target: w, cols: 2,
+        promptHtml: `<div class="q">اسمع: أين الكلمة التي تنتهي بحرف ساكن؟</div><div class="ear">👂</div>`,
+        say: w, slow: true,
+        options: shuffle([sylOpt(w, w, true), sylOpt(open, open, false)]),
+        praise: w
+      };
+    }
+    return {
+      kind: "choice", key: "sk:" + w, target: w, cols: 3,
+      promptHtml: `<div class="q">اسمع واختر ما سمعت</div><div class="ear">👂</div>`,
+      say: w, slow: true,
+      options: shuffle(all).map((x) => sylOpt(x, x, x === w)),
+      praise: w
+    };
+  },
+
+  // 4) المقاطع
+  syllables() {
+    const v = variant({ count: 2, first: 2, last: 2 });
+    const [w] = store.pickWeighted(wordsOf(["short", "sukun", "madd"]), (x) => "syl:" + x.w);
+    if (v === "count") {
+      const n = w.syl.length;
+      return {
+        kind: "choice", key: "syl:" + w.w, target: String(n),
+        promptHtml: `<div class="q">كم مقطعاً في هذه الكلمة؟</div><div class="pic small-pic">${w.emoji}</div><div class="big">${w.w}</div>`,
+        say: w.syl.join("، "), slow: true,
+        options: [1, 2, 3, 4].map((k) => ({ id: String(k), html: toArabicDigits(k), right: k === n, num: true })),
+        praise: `${w.syl.join("، ")}: ${w.w}`
+      };
+    }
+    const k = v === "first" ? 0 : w.syl.length - 1;
+    const right = w.syl[k];
+    const pool = new Set([right]);
+    const alt = altSyllable(right);
+    if (alt) pool.add(alt);
+    // المشتّتات: المقطع نفسه بحركة مختلفة + مقاطع من نفس الموضع في كلمات أخرى
+    for (const x of shuffle(SPELL_WORDS)) {
+      if (pool.size >= 3) break;
+      const other = v === "first" ? x.syl[0] : x.syl.at(-1);
+      if (other) pool.add(other);
+    }
+    return {
+      kind: "choice", key: "syl:" + w.w, target: right, cols: 3,
+      promptHtml: `<div class="q">ما المقطع ${v === "first" ? "الأول" : "الأخير"} في كلمة:</div><div class="pic small-pic">${w.emoji}</div><div class="big">${w.w}</div>`,
+      say: w.w, slow: true,
+      options: shuffle([...pool]).map((x) => sylOpt(x, x, x === right)),
+      praise: right
+    };
+  },
+
+  // 5) التنوين
+  tanween() {
+    const v = variant({ hear: 3, name: 2, vs: 2 });
+    const [t] = store.pickWeighted(TANWEEN, (x) => "tn:" + x.id);
+    const L = randomOf(SYL_LETTERS);
+    if (v === "name") {
+      return {
+        kind: "choice", key: "tn:" + t.id, target: t.id, cols: 3,
+        promptHtml: `<div class="q">ما نوع التنوين؟</div><div class="big">${L.l + t.mark}</div>`,
+        say: L.l + t.mark,
+        options: shuffle(TANWEEN).map((x) => textOpt(x.id, x.name, x === t)),
+        praise: t.name
+      };
+    }
+    if (v === "vs") {
+      const h = HARAKAT[TANWEEN.indexOf(t)];
+      const opts = [sylOpt("t", L.l + t.mark, true), sylOpt("h", L.l + h.mark, false), ...pick(TANWEEN.filter((x) => x !== t), 2).map((x) => sylOpt("o" + x.id, L.l + x.mark, false))];
+      return {
+        kind: "choice", key: "tn:" + t.id, target: "t",
+        promptHtml: `<div class="q">اختر حرف <b>${L.name}</b> مع <b>${t.name}</b></div>`,
+        say: `حرف ${L.name} مع ${t.name}`,
+        options: shuffle(opts),
+        praise: L.l + t.mark
+      };
+    }
+    return {
+      kind: "choice", key: "tn:" + t.id, target: t.id, cols: 3,
+      promptHtml: `<div class="q">اسمع واختر</div><div class="ear">👂</div>`,
+      say: L.l + t.mark, slow: true,
+      options: shuffle(TANWEEN).map((x) => sylOpt(x.id, L.l + x.mark, x === t)),
+      praise: `${t.name}: ${L.l + t.mark}`
+    };
+  },
+
+  // 6) الشدّة
+  shadda() {
+    const v = variant({ mark: 2, word: 2, split: 3 });
+    if (v === "mark") {
+      const L = randomOf(SYL_LETTERS);
+      const [h] = store.pickWeighted(HARAKAT, (x) => "sh:" + x.id);
+      const opts = [
+        sylOpt("r", L.l + SHADDA + h.mark, true),
+        sylOpt("p", withH(L, h), false),
+        ...HARAKAT.filter((x) => x !== h).map((x) => sylOpt("o" + x.id, L.l + SHADDA + x.mark, false))
+      ];
+      return {
+        kind: "choice", key: "sh:" + h.id, target: "r",
+        promptHtml: `<div class="q">اختر حرف <b>${L.name}</b> مع الشدّة و<b>${h.name}</b></div>`,
+        say: `حرف ${L.name} مع الشدة و${h.name}`,
+        options: shuffle(opts),
+        praise: L.l + SHADDA + h.mark
+      };
+    }
+    const sh = wordsOf(["shadda"]);
+    const [w] = store.pickWeighted(sh, (x) => "sh:" + x.w);
+    if (v === "word") {
+      const others = pick(SPELL_WORDS.filter((x) => x.type !== "shadda"), optionCount() - 1);
+      return {
+        kind: "choice", key: "sh:" + w.w, target: w.w,
+        promptHtml: `<div class="q">أي كلمة فيها شدّة؟</div><div class="ooo-icon">💪</div>`,
+        say: "أي كلمة فيها شدة؟",
+        options: shuffle([w, ...others]).map((x) => ({ id: x.w, html: x.w, right: x === w, word: true })),
+        praise: w.w
+      };
+    }
+    // تفكيك الشدّة إلى مقاطع
+    const right = w.syl.join(" + ");
+    const wrong1 = w.syl.map((x, i) => (i === 0 ? x.replace(SUKUN, "") : x)).join(" + ");
+    const wrong2 = w.syl.filter((_, i) => i !== 1).join(" + ");
+    return {
+      kind: "choice", key: "sh:" + w.w, target: right, wide: true,
+      promptHtml: `<div class="q">كيف نتهجّى هذه الكلمة؟</div><div class="pic small-pic">${w.emoji}</div><div class="big">${w.w}</div>`,
+      say: w.w, slow: true,
+      options: shuffle([...new Set([right, wrong1, wrong2])]).map((x) => ({ id: x, html: x, right: x === right, sentence: true })),
+      praise: `${w.syl.join("، ")}: ${w.w}`
+    };
+  },
+
+  // 7) ال الشمسية والقمرية
+  lam() {
+    const items = ALL_WORDS.filter((w) => byLetter[w.w[0]] && w.w[0] !== "ل");
+    const [w] = store.pickWeighted(items, (x) => "lam:" + x.w);
+    const shams = isShams(w.w[0]);
+    const word = "ال" + w.w;
+    if (variant({ classify: 3, pick: 2 }) === "pick") {
+      const wantShams = Math.random() < 0.5;
+      const right = shuffle(items.filter((x) => isShams(x.w[0]) === wantShams))[0];
+      const wrong = pick(items.filter((x) => isShams(x.w[0]) !== wantShams), 2);
+      return {
+        kind: "choice", key: "lam:" + right.w, target: right.w, cols: 3,
+        promptHtml: `<div class="q">اختر الكلمة التي لامها <b>${wantShams ? "شمسية ☀️" : "قمرية 🌙"}</b></div>`,
+        say: `اختر الكلمة التي لامها ${wantShams ? "شمسية" : "قمرية"}`,
+        options: shuffle([right, ...wrong]).map((x) => ({ id: x.w, html: "ال" + x.w, right: x === right, word: true })),
+        praise: "ال" + right.w
+      };
+    }
+    return {
+      kind: "choice", key: "lam:" + w.w, target: shams ? "s" : "q", cols: 2,
+      promptHtml: `<div class="q">هل اللام هنا شمسية أم قمرية؟</div><div class="pic small-pic">${w.emoji}</div><div class="big">${word}</div>`,
+      say: word,
+      options: [textOpt("s", "☀️ شمسية<br><small>لا نقرأ اللام</small>", shams), textOpt("q", "🌙 قمرية<br><small>نقرأ اللام</small>", !shams)],
+      praise: shams ? `${word}، لام شمسية` : `${word}، لام قمرية`
+    };
+  },
+
+  // 8) تهجّ الكلمة: تركيب الكلمة من مقاطعها
+  build() {
+    const [w] = store.pickWeighted(SPELL_WORDS, (x) => "tj:" + x.w);
+    const extras = [];
+    for (const sy of shuffle(w.syl)) {
+      const a = altSyllable(sy);
+      if (a && !w.syl.includes(a) && !extras.includes(a)) extras.push(a);
+      if (extras.length >= 2) break;
+    }
+    return {
+      kind: "build", key: "tj:" + w.w, word: { w: w.w, emoji: w.emoji },
+      parts: w.syl, extras, sayParts: true, slow: true,
+      title: "تهجَّ الكلمة: رتّب المقاطع",
+      praise: `${w.syl.join("، ")}... ${w.w}`
+    };
+  },
+
+  // 9) الإملاء: اسمع واكتب بالحروف، بلا صورة
+  dictation() {
+    const pool = ALL_WORDS.filter((w) => [...w.w].length <= 5);
+    const [w] = store.pickWeighted(pool, (x) => "dict:" + x.w);
+    return {
+      kind: "build", key: "dict:" + w.w, word: w, hidePic: true, slow: true,
+      title: "اسمع الكلمة واكتبها",
+      praise: `أحسنت! ${w.w}`
+    };
+  },
+
+  // قراءة الكلمة المشكولة (في قسم القراءة)
+  readVowel() {
+    const [w] = store.pickWeighted(SPELL_WORDS, (x) => "rv:" + x.w);
+    const seen = new Set([w.emoji]);
+    const others = shuffle(SPELL_WORDS).filter((x) => !seen.has(x.emoji) && seen.add(x.emoji)).slice(0, optionCount() - 1);
+    return {
+      kind: "choice", key: "rv:" + w.w, target: w.w,
+      promptHtml: `<div class="q">اقرأ الكلمة واختر صورتها</div><div class="big">${w.w}</div>`,
+      say: null,
+      options: shuffle([w, ...others]).map((x) => ({ id: x.w, html: x.emoji, right: x === w, emoji: true })),
+      praise: w.w
     };
   }
 };

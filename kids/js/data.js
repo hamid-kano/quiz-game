@@ -419,3 +419,131 @@ export const RIDDLES = [
   { q: "أقول: مياو، وأحب الحليب. من أنا؟", e: "🐱" },
   { q: "أعطيك الحليب، وأقول: موو. من أنا؟", e: "🐄" }
 ];
+
+// ============================================================
+//  التهجئة: كلمات مشكولة ومقسّمة إلى مقاطع
+//  type: short = حركات قصيرة فقط، sukun = فيها ساكن، madd = فيها مدّ، shadda = فيها شدّة
+// ============================================================
+export const SPELL_WORDS = [
+  // حركات قصيرة
+  { w: "كَتَبَ", syl: ["كَ", "تَ", "بَ"], emoji: "✍️", type: "short" },
+  { w: "شَرِبَ", syl: ["شَ", "رِ", "بَ"], emoji: "🥤", type: "short" },
+  { w: "أَكَلَ", syl: ["أَ", "كَ", "لَ"], emoji: "🍽️", type: "short" },
+  { w: "لَعِبَ", syl: ["لَ", "عِ", "بَ"], emoji: "🪀", type: "short" },
+  { w: "جَلَسَ", syl: ["جَ", "لَ", "سَ"], emoji: "🪑", type: "short" },
+  { w: "رَسَمَ", syl: ["رَ", "سَ", "مَ"], emoji: "🎨", type: "short" },
+  { w: "قَمَرٌ", syl: ["قَ", "مَ", "رٌ"], emoji: "🌙", type: "short" },
+  { w: "جَمَلٌ", syl: ["جَ", "مَ", "لٌ"], emoji: "🐫", type: "short" },
+  { w: "أَسَدٌ", syl: ["أَ", "سَ", "دٌ"], emoji: "🦁", type: "short" },
+  { w: "وَلَدٌ", syl: ["وَ", "لَ", "دٌ"], emoji: "👦", type: "short" },
+  { w: "قَلَمٌ", syl: ["قَ", "لَ", "مٌ"], emoji: "✏️", type: "short" },
+  { w: "عِنَبٌ", syl: ["عِ", "نَ", "بٌ"], emoji: "🍇", type: "short" },
+  { w: "نَمِرٌ", syl: ["نَ", "مِ", "رٌ"], emoji: "🐯", type: "short" },
+  { w: "ذَهَبٌ", syl: ["ذَ", "هَ", "بٌ"], emoji: "🪙", type: "short" },
+  { w: "بَقَرَةٌ", syl: ["بَ", "قَ", "رَ", "ةٌ"], emoji: "🐄", type: "short" },
+  { w: "شَجَرَةٌ", syl: ["شَ", "جَ", "رَ", "ةٌ"], emoji: "🌳", type: "short" },
+  { w: "سَمَكَةٌ", syl: ["سَ", "مَ", "كَ", "ةٌ"], emoji: "🐟", type: "short" },
+  { w: "وَرَقَةٌ", syl: ["وَ", "رَ", "قَ", "ةٌ"], emoji: "🍃", type: "short" },
+  // فيها ساكن
+  { w: "شَمْسٌ", syl: ["شَمْ", "سٌ"], emoji: "☀️", type: "sukun" },
+  { w: "بِنْتٌ", syl: ["بِنْ", "تٌ"], emoji: "👧", type: "sukun" },
+  { w: "كَلْبٌ", syl: ["كَلْ", "بٌ"], emoji: "🐶", type: "sukun" },
+  { w: "قِرْدٌ", syl: ["قِرْ", "دٌ"], emoji: "🐵", type: "sukun" },
+  { w: "خُبْزٌ", syl: ["خُبْ", "زٌ"], emoji: "🍞", type: "sukun" },
+  { w: "طَبْلٌ", syl: ["طَبْ", "لٌ"], emoji: "🥁", type: "sukun" },
+  { w: "بَيْتٌ", syl: ["بَيْ", "تٌ"], emoji: "🏠", type: "sukun" },
+  { w: "مَوْزٌ", syl: ["مَوْ", "زٌ"], emoji: "🍌", type: "sukun" },
+  { w: "نَجْمَةٌ", syl: ["نَجْ", "مَ", "ةٌ"], emoji: "⭐", type: "sukun" },
+  { w: "نَحْلَةٌ", syl: ["نَحْ", "لَ", "ةٌ"], emoji: "🐝", type: "sukun" },
+  { w: "وَرْدَةٌ", syl: ["وَرْ", "دَ", "ةٌ"], emoji: "🌹", type: "sukun" },
+  // فيها مدّ
+  { w: "بَابٌ", syl: ["بَا", "بٌ"], emoji: "🚪", type: "madd" },
+  { w: "تَاجٌ", syl: ["تَا", "جٌ"], emoji: "👑", type: "madd" },
+  { w: "حُوتٌ", syl: ["حُو", "تٌ"], emoji: "🐋", type: "madd" },
+  { w: "فِيلٌ", syl: ["فِي", "لٌ"], emoji: "🐘", type: "madd" },
+  { w: "كِتَابٌ", syl: ["كِ", "تَا", "بٌ"], emoji: "📖", type: "madd" },
+  { w: "غَزَالٌ", syl: ["غَ", "زَا", "لٌ"], emoji: "🦌", type: "madd" },
+  { w: "حِصَانٌ", syl: ["حِ", "صَا", "نٌ"], emoji: "🐴", type: "madd" },
+  { w: "خَرُوفٌ", syl: ["خَ", "رُو", "فٌ"], emoji: "🐑", type: "madd" },
+  { w: "صَارُوخٌ", syl: ["صَا", "رُو", "خٌ"], emoji: "🚀", type: "madd" },
+  { w: "لَيْمُونٌ", syl: ["لَيْ", "مُو", "نٌ"], emoji: "🍋", type: "madd" },
+  { w: "زَيْتُونٌ", syl: ["زَيْ", "تُو", "نٌ"], emoji: "🫒", type: "madd" },
+  { w: "مِفْتَاحٌ", syl: ["مِفْ", "تَا", "حٌ"], emoji: "🔑", type: "madd" },
+  { w: "دَجَاجَةٌ", syl: ["دَ", "جَا", "جَ", "ةٌ"], emoji: "🐔", type: "madd" },
+  // فيها شدّة (الحرف المشدّد = حرف ساكن + حرف متحرك)
+  { w: "قِطَّةٌ", syl: ["قِطْ", "طَ", "ةٌ"], emoji: "🐱", type: "shadda" },
+  { w: "بَطَّةٌ", syl: ["بَطْ", "طَ", "ةٌ"], emoji: "🦆", type: "shadda" },
+  { w: "دُبٌّ", syl: ["دُبْ", "بٌ"], emoji: "🐻", type: "shadda" },
+  { w: "أُمٌّ", syl: ["أُمْ", "مٌ"], emoji: "👩", type: "shadda" },
+  { w: "سُكَّرٌ", syl: ["سُكْ", "كَ", "رٌ"], emoji: "🍬", type: "shadda" },
+  { w: "تُفَّاحَةٌ", syl: ["تُفْ", "فَا", "حَ", "ةٌ"], emoji: "🍎", type: "shadda" }
+];
+
+// كلمات قصيرة من مقطع واحد مغلق (حرف متحرك + حرف ساكن)
+export const CLOSED_SYLLABLES = ["مِنْ", "عَنْ", "لَمْ", "هَلْ", "قُمْ", "كَمْ", "بَلْ", "قَدْ", "لَنْ", "كُنْ", "قُلْ", "بِعْ"];
+
+export const TANWEEN = [
+  { id: "f", mark: "ً", name: "تنوين الفتح" },
+  { id: "d", mark: "ٌ", name: "تنوين الضم" },
+  { id: "k", mark: "ٍ", name: "تنوين الكسر" }
+];
+
+// الحروف الشمسية (لا تُنطق اللام قبلها)، والباقي قمرية
+export const SHAMS_LETTERS = ["ت", "ث", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ل", "ن"];
+
+// دليل التهجئة: خطوات الطريقة بالترتيب، كل خطوة مرتبطة بنشاط التمرين
+export const SPELL_LESSONS = [
+  { icon: "🎵", title: "الحركات القصيرة", act: "spShort",
+    rule: "الفتحة فوق الحرف، والضمة فوقه بشكل واو صغيرة، والكسرة تحته. كل حركة تعطي الحرف صوتاً قصيراً.",
+    examples: ["بَ", "بُ", "بِ", "سَ", "سُ", "سِ", "مَ", "مُ", "مِ"] },
+  { icon: "〰️", title: "المدود", act: "spMadd",
+    rule: "حرف المدّ يُطيل الصوت: الألف بعد الفتحة، والواو بعد الضمة، والياء بعد الكسرة.",
+    examples: ["بَا", "بُو", "بِي", "سَا", "سُو", "سِي"] },
+  { icon: "⭕", title: "السكون", act: "spSukun",
+    rule: "السكون دائرة صغيرة فوق الحرف، تعني أن الحرف بلا حركة، فنقف عنده.",
+    examples: ["مِنْ", "عَنْ", "قُمْ", "هَلْ", "كَمْ"] },
+  { icon: "🧩", title: "المقاطع", act: "spSyllables",
+    rule: "الكلمة تتكوّن من مقاطع. نقرأ كل مقطع وحده ثم نجمعها.",
+    examples: ["كَ", "تَ", "بَ", "كَتَبَ", "شَمْ", "سٌ", "شَمْسٌ"] },
+  { icon: "🔔", title: "التنوين", act: "spTanween",
+    rule: "التنوين حركتان، نسمع في آخره صوت نون ساكنة، ويأتي في آخر الكلمة.",
+    examples: ["بً", "بٌ", "بٍ", "قَمَرٌ", "قَلَمٌ"] },
+  { icon: "💪", title: "الشدّة", act: "spShadda",
+    rule: "الشدّة تعني أن الحرف مكتوب مرة ومنطوق مرتين: الأول ساكن والثاني متحرك.",
+    examples: ["بَّ", "قِطَّةٌ", "قِطْ", "طَ", "ةٌ"] },
+  { icon: "☀️", title: "ال الشمسية والقمرية", act: "spLam",
+    rule: "مع الحروف القمرية نقرأ اللام: القَمَر. ومع الحروف الشمسية لا نقرأ اللام ونشدّد الحرف بعدها: الشَّمْس.",
+    examples: ["القمر", "الكتاب", "الشمس", "السمكة"] },
+  { icon: "🏆", title: "التهجئة الكاملة", act: "spBuild",
+    rule: "نسمع الكلمة، نقسّمها إلى مقاطع، نكتب كل مقطع بالترتيب، ثم نقرأ الكلمة كاملة.",
+    examples: ["كِ", "تَا", "بٌ", "كِتَابٌ"] }
+];
+
+// إضافة قسم التهجئة بعد قسم الحروف
+SKILLS.splice(2, 0, {
+  id: "spelling", icon: "🔡", name: "التهجئة", color: "#6a4c93",
+  goal: "يتعلّم طريقة التهجئة خطوة بخطوة: الحركات، المدود، السكون، المقاطع، التنوين، الشدّة، ثم الكلمة كاملة",
+  prefixes: ["hs:", "md:", "sk:", "syl:", "tn:", "sh:", "lam:", "tj:", "dict:"], target: 60,
+  activities: [
+    { id: "spGuide", type: "spellGuide", title: "دليل التهجئة", desc: "القواعد خطوة بخطوة مع أمثلة مسموعة", icon: "🧭", age: "all" },
+    { id: "spShort", type: "spell", mode: "short", step: 1, title: "الحركات القصيرة", desc: "بَ بُ بِ", icon: "🎵", age: "all" },
+    { id: "spMadd", type: "spell", mode: "madd", step: 2, title: "المدود", desc: "بَا بُو بِي", icon: "〰️", age: "all" },
+    { id: "spSukun", type: "spell", mode: "sukun", step: 3, title: "السكون", desc: "مِنْ، قُمْ، هَلْ", icon: "⭕", age: "big" },
+    { id: "spSyllables", type: "spell", mode: "syllables", step: 4, title: "المقاطع", desc: "قسّم الكلمة إلى مقاطع", icon: "🧩", age: "big" },
+    { id: "spTanween", type: "spell", mode: "tanween", step: 5, title: "التنوين", desc: "بً بٌ بٍ", icon: "🔔", age: "big" },
+    { id: "spShadda", type: "spell", mode: "shadda", step: 6, title: "الشدّة", desc: "قِطَّةٌ = قِطْ + طَ + ةٌ", icon: "💪", age: "big" },
+    { id: "spLam", type: "spell", mode: "lam", step: 7, title: "ال الشمسية والقمرية", desc: "الشَّمْس والقَمَر", icon: "☀️", age: "big" },
+    { id: "spBuild", type: "spell", mode: "build", step: 8, title: "تهجَّ الكلمة", desc: "اسمع وركّب الكلمة من مقاطعها", icon: "🏆", age: "big" },
+    { id: "spDictation", type: "spell", mode: "dictation", step: 9, title: "الإملاء", desc: "اسمع الكلمة واكتبها بلا صورة", icon: "📝", age: "big" }
+  ]
+});
+
+// القراءة: استبدال نشاط الحركات (انتقل إلى قسم التهجئة) بقراءة الكلمات المشكولة
+{
+  const reading = SKILLS.find((s) => s.id === "reading");
+  reading.activities = reading.activities.filter((a) => a.id !== "harakat");
+  reading.activities.unshift({ id: "readVowel", type: "spell", mode: "readVowel", title: "اقرأ المشكول", desc: "اقرأ الكلمة بحركاتها واختر صورتها", icon: "🔤", age: "big" });
+  reading.prefixes.push("rv:");
+  ACTIVITIES.length = 0;
+  ACTIVITIES.push(...SKILLS.flatMap((sk) => sk.activities.map((a) => ({ ...a, skill: sk.id }))));
+}
