@@ -5,6 +5,7 @@
 //    ثم نقيس متوسط المسافة بين خطوط الطفل وخطوط الشكل في الاتجاهين
 // ============================================================
 
+import { LANG } from "./lang.js";
 const N = 96;
 // حدود القبول في الكتابة الحرّة (معايَرة على كل الحروف)
 export const TH = { cov: 0.6, prec: 0.8, ink: 2.8 };
@@ -203,8 +204,13 @@ export function letterGuide(text) {
     const top = body.filter((i) => ((i / N) | 0) <= box.y0 + 2);
     const sx = top.reduce((a, i) => a + (i % N), 0) / top.length;
     start = { x: (sx + 0.5) / N, y: (box.y0 + 1) / N };
+  } else if (LANG.contentDir === "ltr") {
+    // الحروف اللاتينية تبدأ غالباً من أعلى نقطة فيها
+    const top = body.filter((i) => ((i / N) | 0) <= box.y0 + 2);
+    const sx = top.reduce((a, i) => a + (i % N), 0) / top.length;
+    start = { x: (sx + 0.5) / N, y: (box.y0 + 1) / N };
   } else {
-    // أقصى اليمين، وأعلى نقطة فيه
+    // العربية: أقصى اليمين، وأعلى نقطة فيه
     const right = body.filter((i) => i % N >= box.x1 - 3);
     const sy = Math.min(...right.map((i) => (i / N) | 0));
     start = { x: (box.x1 - 1) / N, y: (sy + 1) / N };
@@ -244,9 +250,11 @@ export function checkOrder(text, strokes) {
     // يبدأ من الأعلى ويتجه للأسفل
     if (s0.y > s1.y + bh * 0.15) return { ok: false, reason: "start" };
   } else {
-    // يبدأ من اليمين: نقطة بداية الخط الرئيسي في يمين الحرف أكثر من نهايته
-    const relStart = (s0.x - g.box.x0) / bw;
-    if (relStart < 0.45 && s1.x > s0.x + bw * 0.25) return { ok: false, reason: "start" };
+    // يبدأ من اليمين في العربية. الحروف اللاتينية تختلف بداياتها (c و e و o...) فلا نفرض جهة
+    if (LANG.contentDir !== "ltr") {
+      const relStart = (s0.x - g.box.x0) / bw;
+      if (relStart < 0.45 && s1.x > s0.x + bw * 0.25) return { ok: false, reason: "start" };
+    }
   }
   return { ok: true };
 }

@@ -30,7 +30,11 @@ def _pick_port():
 
 PORT = _pick_port()
 os.environ["HUROOFI_PORT"] = str(PORT)
-BASE = f"http://127.0.0.1:{PORT}/kids/"
+# التطبيق المختبَر: العربي (kids) أو الإنجليزي (english/www) — HUROOFI_APP=english
+APP = os.environ.get("HUROOFI_APP", "kids")
+APP_DIR = {"kids": "kids", "english": "english/www"}[APP]
+BASE = f"http://127.0.0.1:{PORT}/{APP_DIR}/"
+STORE_KEY = {"kids": "huroofi-v2", "english": "huroofi-en-v1"}[APP]
 
 def start_server():
     """يشغّل خادماً محلياً للمستودع إن لم يكن يعمل."""
@@ -60,15 +64,21 @@ MOCK = r"""
   const voice = { lang: 'ar-SA', name: 'Fake Arabic', voiceURI: 'fake', localService: true, default: true };
   const synth = {
     getVoices: () => (MODE === 'android' ? [] : [voice]), onvoiceschanged: null,
-    get speaking() { return !!cur; }, get pending() { return false; },
-    cancel() { if (cur) { log.push({ ev: 'cancel', text: cur.u.text, t: performance.now() }); clearTimeout(cur.timer); const u = cur.u; cur = null; u.onerror && u.onerror({ error: 'canceled' }); } },
-    speak(u) {
-      if (cur) this.cancel();
-      const dur = u.text.length * 60 / u.rate;
-      log.push({ ev: 'start', text: u.text, t: performance.now() });
-      u.onstart && setTimeout(() => u.onstart({}), 10);
-      cur = { u, timer: setTimeout(() => { log.push({ ev: 'end', text: u.text, t: performance.now() }); cur = null; if (MODE !== 'noend') u.onend && u.onend(); }, dur) };
-    }
+    get speaking() { return !!cur; }, get pending() { return queue.length > 0; },
+    // مثل المتصفحات الحقيقية: العبارات تنتظر في طابور، و cancel يلغي الحالية وكل ما ينتظر
+    cancel() {
+      const waiting = queue.splice(0);
+      if (cur) { log.push({ ev: 'cancel', text: cur.u.text, t: performance.now() }); clearTimeout(cur.timer); const u = cur.u; cur = null; u.onerror && u.onerror({ error: 'canceled' }); }
+      waiting.forEach((u) => u.onerror && u.onerror({ error: 'canceled' }));
+    },
+    speak(u) { if (cur) queue.push(u); else play(u); }
+  };
+  const queue = [];
+  const play = (u) => {
+    const dur = u.text.length * 60 / u.rate;
+    log.push({ ev: 'start', text: u.text, t: performance.now() });
+    u.onstart && setTimeout(() => u.onstart({}), 10);
+    cur = { u, timer: setTimeout(() => { log.push({ ev: 'end', text: u.text, t: performance.now() }); cur = null; if (MODE !== 'noend') u.onend && u.onend(); if (queue.length) play(queue.shift()); }, dur) };
   };
   Object.defineProperty(window, 'speechSynthesis', { value: synth });
   window.SpeechSynthesisUtterance = function (text) { this.text = text; this.rate = 1; };
@@ -197,6 +207,9 @@ async def solve_keyboard(pg):
 
 # ---------------- حلول الألعاب ----------------
 AR = "٠١٢٣٤٥٦٧٨٩"
+def parse_num(s):
+    """رقم مكتوب بالأرقام العربية الهندية أو اللاتينية"""
+    return int("".join(str(AR.index(ch)) if ch in AR else ch for ch in s if ch in AR or ch.isdigit()))
 async def maps(pg):
     return await pg.evaluate("""async()=>{const d=await import('./js/data.js');const e2w={};for(const w of d.ALL_WORDS)e2w[w.emoji]=w.w;for(const [l,ws] of Object.entries(d.LETTER_WORDS))for(const w of ws)e2w[w.emoji]=w.w;
       const e2c={};for(const c of d.CATEGORIES)for(const i of c.items)e2c[i]=c.id;return {e2w,e2c}}""")
@@ -250,7 +263,7 @@ async def baskets(pg, M):
 async def shop(pg, M):
     if not await pg.locator(".paybtn").count() or not await pg.locator(".paybtn").is_visible(): return
     tag = (await pg.locator(".tag").inner_text()).split()[0]
-    price = int("".join(str(AR.index(ch)) for ch in tag if ch in AR))
+    price = parse_num(tag)
     coins = [5,2,1] if await pg.locator(".wallet .c5").count() else [1]
     left = price
     for c in coins:

@@ -8,3 +8,12 @@ android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
 *.keystore
 *.jks
+english/www/
+english/android/.gradle/
+english/android/build/
+english/android/app/build/
+english/android/local.properties
+english/android/app/src/main/assets/public/
+english/android/app/src/main/assets/capacitor.config.json
+english/android/app/src/main/assets/capacitor.plugins.json
+__pycache__/

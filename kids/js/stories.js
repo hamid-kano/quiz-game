@@ -38,7 +38,7 @@ function readStory(st, i, back, onFinish) {
   const page = st.pages[i];
   const last = i === st.pages.length - 1;
   // كل كلمة زر يمكن الضغط عليه لسماعها
-  const words = page.text.split(" ").map((w) => `<button class="word" data-w="${esc(w.replace(/[.،!؟]/g, ""))}">${esc(w)}</button>`).join(" ");
+  const words = page.text.split(" ").map((w) => `<button class="word" data-w="${esc(w.replace(/[.،!؟?,"]/g, ""))}">${esc(w)}</button>`).join(" ");
   render(`
     <div class="topbar">
       <button class="icon-btn" id="back" aria-label="خروج">✖</button>
@@ -50,6 +50,7 @@ function readStory(st, i, back, onFinish) {
       <div class="story-pic">${page.pic}</div>
       <p class="story-text">${words}</p>
       <button class="speak" id="read">🔊 اقرأ لي</button>
+      ${page.ar ? `<button class="speak alt" id="mean">🌐 ماذا تعني؟</button><p class="story-ar" id="ar" hidden>${esc(page.ar)}</p>` : ""}
       <p class="muted">اضغط على أي كلمة لتسمعها</p>
     </div>
     <div class="learn-nav">
@@ -58,6 +59,8 @@ function readStory(st, i, back, onFinish) {
     </div>
   `);
   $("#back").onclick = () => { stopSpeech(); back(); };
+  // الترجمة (في تطبيق الإنجليزية): تظهر عند الطلب فقط حتى يحاول الطفل الفهم أولاً
+  if ($("#mean")) $("#mean").onclick = () => { $("#ar").hidden = false; speak(page.ar); };
   $("#read").onclick = () => speak(page.text);
   $$(".word").forEach((w) => (w.onclick = () => {
     $$(".word").forEach((x) => x.classList.remove("lit"));

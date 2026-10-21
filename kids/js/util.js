@@ -1,5 +1,6 @@
 // أدوات عامة صغيرة
 
+import { LANG } from "./lang.js";
 export const shuffle = (arr) => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -39,6 +40,8 @@ export function daysBetween(a, b) {
 }
 
 export const toArabicDigits = (n) => String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+// أرقام المحتوى: هندية في التطبيق العربي، ولاتينية (1 2 3) في تطبيق الإنجليزية
+export const contentDigits = (n) => (LANG.digits === "latin" ? String(n) : toArabicDigits(n));
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -54,6 +57,8 @@ export function toast(msg) {
 
 // أشكال الحرف داخل الكلمة
 export function letterForms(L) {
+  // لغات أخرى تحدد أشكال الحرف بنفسها (مثل الحرف الكبير والصغير في الإنجليزية)
+  if (L.forms) return L.forms;
   const t = "ـ";
   return L.c
     ? [["منفرد", L.l], ["أول", L.l + t], ["وسط", t + L.l + t], ["آخر", t + L.l]]

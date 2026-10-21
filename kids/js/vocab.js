@@ -3,6 +3,7 @@
 // ============================================================
 import { VOCAB } from "./data.js";
 import { store } from "./store.js";
+import { ageRank } from "./lang.js";
 import { speak, stopSpeech, sfx } from "./sfx.js";
 import { render, $, $$, esc, toArabicDigits } from "./util.js";
 import { GEN, runSession } from "./games.js";
@@ -47,7 +48,7 @@ function screenTheme(act, theme, back, onFinish) {
     </div>
     <p class="sub">اضغط على كل صورة لتسمع اسمها</p>
     <div class="vcards">
-      ${theme.words.map((w) => `<button class="vcard" data-w="${esc(w.w)}"><span>${w.emoji}</span><b>${w.w}</b></button>`).join("")}
+      ${theme.words.map((w) => `<button class="vcard" data-w="${esc(w.w)}" data-ar="${esc(w.ar || "")}"><span>${w.emoji}</span><b class="cword">${w.w}</b>${w.ar ? `<small class="mean">${w.ar}</small>` : ""}</button>`).join("")}
     </div>
     <div class="result-actions">
       <button class="btn block" id="quiz">🎯 اختبرني في ${theme.name}</button>
@@ -58,7 +59,8 @@ function screenTheme(act, theme, back, onFinish) {
   $$(".vcard").forEach((b) => (b.onclick = () => {
     $$(".vcard").forEach((x) => x.classList.remove("lit"));
     b.classList.add("lit");
-    speak(b.dataset.w, { slow: store.active.age === "small" });
+    // في تطبيق الإنجليزية: الكلمة ثم معناها بالعربية
+    speak(b.dataset.ar ? `${b.dataset.w}... ${b.dataset.w}، ${b.dataset.ar}` : b.dataset.w, { slow: ageRank(store.active.age) === 0 });
   }));
   $("#quiz").onclick = () => {
     stopSpeech();

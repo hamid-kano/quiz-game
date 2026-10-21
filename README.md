@@ -6,6 +6,8 @@
 
 **🦉 تطبيق حروفي للأطفال:** https://hamid-kano.github.io/quiz-game/kids/
 
+**🐝 حروفي English (تعلّم الإنجليزية):** https://hamid-kano.github.io/quiz-game/english/
+
 ## المزايا
 - 4 فئات: ثقافة عامة، علوم، برمجة وتقنية، تاريخ
 - 3 مستويات صعوبة حسب الوقت المتاح لكل سؤال
@@ -98,3 +100,14 @@ npx serve .
 - منطق الأسئلة وأنواعها في `kids/js/exercises.js`
 - عند إضافة ملفات جديدة حدّث القائمة ورقم الإصدار في `kids/sw.js`
 - الخطوط Cairo و Noto Naskh Arabic مرخّصة بـ SIL OFL (انظر `kids/fonts/LICENSE.txt`)
+
+
+## 🐝 حروفي English — تعلّم الإنجليزية (مجلد `english/`)
+تطبيق منفصل (اسم حزمة مختلف في المتجر: `app.huroofi.english`) لكنه **يستخدم نفس محرّك حروفي**: كل تحسين في `kids/` يصل للتطبيقين.
+الواجهة والتعليمات بالعربية، والمحتوى بالإنجليزية، لثلاث فئات عمرية: صغير (3–5)، كبير (6–8)، متقدّم (9–12).
+
+- `kids/js/lang.js`: إعدادات اللغة (الاسم، اتجاه المحتوى، الأعمار، لوحة المفاتيح، مفتاح التخزين). النطق يقسّم النص المختلط تلقائياً: العربي بصوت عربي والإنجليزي بصوت إنجليزي.
+- `english/src/`: ما يختلف فقط: `js/lang.js`، `js/data.js` (المحتوى)، `js/lang-exercises.js` (Phonics، الحرف الكبير والصغير، المعاني، القواعد، أسماء الأعداد)، `css/lang.css` (خط Andika واتجاه المحتوى)، الأيقونات.
+- `node scripts/build-english.mjs` يبني `english/www` = محرّك `kids/` + ملفات `english/src/` فوقه.
+- الاختبارات نفسها تعمل على التطبيقين: `HUROOFI_APP=english python3 tests/run_all.py`.
+- أندرويد: `english/android/` (يُبنى في GitHub Actions مع التطبيق العربي، ونسخة التجربة في إصدار `android-english-latest`). حقيبة المتجر في `english/store/`.

@@ -5,6 +5,7 @@ import { SKILLS } from "./data.js";
 import { store } from "./store.js";
 import { render, $, esc, today, toArabicDigits, toast } from "./util.js";
 import { sfx } from "./sfx.js";
+import { LANG } from "./lang.js";
 import { isNative, saveFile } from "./native.js";
 
 // شهادة لكل مهارة عند بلوغ 80٪ من إتقانها، وشهادة للمواظبة
@@ -21,7 +22,7 @@ const SKILL_CERT_TEXT = {
 export const CERTIFICATES = [
   ...SKILLS.map((sk) => ({
     id: "skill-" + sk.id, skill: sk.id, icon: sk.icon, title: `بطل ${sk.name}`,
-    text: SKILL_CERT_TEXT[sk.id],
+    text: sk.certText || SKILL_CERT_TEXT[sk.id],
     how: `اوصل إلى ٨٠٪ من إتقان مهارة ${sk.name}`,
     check: (p) => store.skillProgress(sk, p).value >= 0.8
   })),
@@ -100,7 +101,7 @@ async function drawCertificate(canvas, c, p) {
   x.textAlign = "right";
   x.fillText(`التاريخ: ${arabicDate()}`, W - 150, H - 150);
   x.textAlign = "left";
-  x.fillText(`⭐ ${toArabicDigits(store.totalStars(p))} نجمة  ·  تطبيق حروفي 🦉`, 150, H - 150);
+  x.fillText(`⭐ ${toArabicDigits(store.totalStars(p))} نجمة  ·  ${LANG.certFooter}`, 150, H - 150);
 }
 
 export async function screenCertificate(c, back) {
@@ -127,7 +128,7 @@ export async function screenCertificate(c, back) {
 
   $("#dl").onclick = async () => {
     try {
-      await saveFile(`شهادة-${p.name || "حروفي"}-${c.title}.png`, { dataUrl: url, mime: "image/png" });
+      await saveFile(`شهادة-${p.name || LANG.appName}-${c.title}.png`, { dataUrl: url, mime: "image/png" });
       if (!isNative) toast("تم تحميل الشهادة ✔");
     } catch { toast("لم يتم الحفظ"); }
   };

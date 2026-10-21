@@ -3,14 +3,31 @@ name: Build Android app
 on:
   push:
     branches: [main]
-    paths: ["kids/**", "android/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
+    paths: ["kids/**", "android/**", "english/**", "scripts/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 permissions:
   contents: write   # لنشر ملف APK في صفحة الإصدارات
 
 jobs:
+  # تطبيقان من نفس المحرّك: حروفي (العربية) وحروفي English
   android:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: arabic
+            dir: .
+            name: huroofi
+            tag: android-latest
+            title: حروفي
+            font: fonts/noto-naskh-arabic-arabic-700-normal.woff2
+          - app: english
+            dir: english
+            name: huroofi-english
+            tag: android-english-latest
+            title: حروفي English
+            font: fonts/andika-latin-400-normal.woff2
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -35,19 +52,20 @@ jobs:
       - name: Install and copy web files into the app
         run: |
           npm ci
-          npx cap sync android
+          if [ "${{ matrix.app }}" = "english" ]; then node scripts/build-english.mjs; fi
+          cd "${{ matrix.dir }}" && "$GITHUB_WORKSPACE/node_modules/.bin/cap" sync android
 
       - name: Build test APK (debug)
-        working-directory: android
+        working-directory: ${{ matrix.dir }}/android
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
-          mv app/build/outputs/apk/debug/app-debug.apk "../huroofi-${VERSION_NAME}-test.apk"
+          mv app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/${{ matrix.name }}-${VERSION_NAME}-test.apk"
 
       # فحص ملف APK: الصلاحيات، والملفات الأساسية داخله، ورقم الإصدار
       - name: Verify APK
         run: |
-          APK="huroofi-${VERSION_NAME}-test.apk"
+          APK="${{ matrix.name }}-${VERSION_NAME}-test.apk"
           AAPT="$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)aapt2"
           BADGING="$($AAPT dump badging "$APK")"
           PERMS="$(echo "$BADGING" | grep uses-permission: | sed "s/.*name='\([^']*\)'.*/\1/" | tr '\n' ' ')"
@@ -58,7 +76,7 @@ jobs:
           SIZE=$(du -h "$APK" | cut -f1)
           echo "::notice title=APK::$PKG | $SDK | $LABEL | size $SIZE | web files $FILES | permissions: $PERMS"
           MISSING=""
-          for f in index.html privacy.html js/main.js js/native.js vendor/capacitor.js fonts/noto-naskh-arabic-arabic-700-normal.woff2 css/style.css; do
+          for f in index.html privacy.html js/main.js js/native.js js/lang.js vendor/capacitor.js ${{ matrix.font }} css/style.css; do
             unzip -l "$APK" | grep -q "assets/public/$f" || MISSING="$MISSING $f"
           done
           if [ -n "$MISSING" ]; then echo "::error title=APK::missing files:$MISSING"; exit 1; fi
@@ -72,20 +90,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp "huroofi-${VERSION_NAME}-test.apk" huroofi.apk
-          NOTES="نسخة تجربة من تطبيق حروفي (الإصدار ${VERSION_NAME}). للتثبيت: نزّل ملف huroofi.apk على جوال أندرويد واسمح بالتثبيت من هذا المصدر."
-          if gh release view android-latest >/dev/null 2>&1; then
-            gh release edit android-latest --title "حروفي ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
+          N="${{ matrix.name }}"; TAG="${{ matrix.tag }}"; T="${{ matrix.title }}"
+          cp "$N-${VERSION_NAME}-test.apk" "$N.apk"
+          NOTES="نسخة تجربة من تطبيق $T (الإصدار ${VERSION_NAME}). للتثبيت: نزّل ملف $N.apk على جوال أندرويد واسمح بالتثبيت من هذا المصدر."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$T ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
           else
-            gh release create android-latest --prerelease --title "حروفي ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
+            gh release create "$TAG" --prerelease --title "$T ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
           fi
-          gh release upload android-latest huroofi.apk --clobber
-          echo "::notice title=Download::https://github.com/${{ github.repository }}/releases/download/android-latest/huroofi.apk"
+          gh release upload "$TAG" "$N.apk" --clobber
+          echo "::notice title=Download::https://github.com/${{ github.repository }}/releases/download/$TAG/$N.apk"
 
       # نسخة المتجر: تُبنى فقط إذا أُضيف مفتاح التوقيع في أسرار المستودع
       - name: Build signed store bundle (AAB)
         if: env.HAS_SIGNING_KEY == 'true'
-        working-directory: android
+        working-directory: ${{ matrix.dir }}/android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -94,14 +113,14 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
           ./gradlew --no-daemon bundleRelease assembleRelease
-          mv app/build/outputs/bundle/release/app-release.aab "../huroofi-${VERSION_NAME}-store.aab"
-          mv app/build/outputs/apk/release/app-release.apk "../huroofi-${VERSION_NAME}-release.apk"
+          mv app/build/outputs/bundle/release/app-release.aab "$GITHUB_WORKSPACE/${{ matrix.name }}-${VERSION_NAME}-store.aab"
+          mv app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/${{ matrix.name }}-${VERSION_NAME}-release.apk"
           rm -f "$RUNNER_TEMP/upload.jks"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: huroofi-android-${{ env.VERSION_NAME }}
+          name: ${{ matrix.name }}-android-${{ env.VERSION_NAME }}
           path: |
-            huroofi-*.apk
-            huroofi-*.aab
+            ${{ matrix.name }}-${{ env.VERSION_NAME }}-*.apk
+            ${{ matrix.name }}-${{ env.VERSION_NAME }}-*.aab
           retention-days: 90

@@ -9,10 +9,19 @@ import {
   SPELL_WORDS, CLOSED_SYLLABLES, TANWEEN, SHAMS_LETTERS, VOCAB
 } from "./data.js";
 import { store } from "./store.js";
-import { shuffle, pick, randomOf, esc, letterForms, toArabicDigits } from "./util.js";
+import { LANG, ageRank } from "./lang.js";
+import { shuffle, pick, randomOf, esc, letterForms, toArabicDigits, contentDigits } from "./util.js";
+import { extendGen } from "./lang-exercises.js";
 
 const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
-const big = () => store.active.age === "big";
+// الحروف التي توجد كلمات تبدأ بها (في الإنجليزية لا كلمة مناسبة تبدأ بحرف x)
+const START = LETTERS.filter((L) => LETTER_WORDS[L.l]?.length);
+// حروف تُنطق بنفس الصوت (مثل c و k في الإنجليزية) لا تكون مشتّتاً لبعضها
+const alikeOf = (l) => [l, ...(byLetter[l]?.alike || [])];
+// «كبير» تعني 6 سنوات فما فوق (تشمل فئة 9–12 في تطبيق الإنجليزية)
+const big = () => ageRank(store.active.age) >= 1;
+// علامة السؤال داخل المحتوى: ؟ في العربية و ? في الإنجليزية
+const QM = LANG.code === "ar" ? "؟" : "?";
 const optionCount = () => (big() ? 4 : 3);
 
 // شكل كل حرف داخل الكلمة حسب اتصاله بما قبله وما بعده
@@ -54,7 +63,7 @@ function variant(table) {
 function letterChoices(target, pool = LETTERS, n = optionCount()) {
   const group = SIMILAR_GROUPS.find((g) => g.includes(target.l)) || [];
   const similar = pool.filter((x) => x !== target && group.includes(x.l));
-  const others = pool.filter((x) => x !== target && !group.includes(x.l));
+  const others = pool.filter((x) => x !== target && !group.includes(x.l) && !alikeOf(target.l).includes(x.l));
   const distract = [...pick(similar, Math.random() < 0.6 ? 1 : 0), ...pick(others, n)].slice(0, n - 1);
   return shuffle([target, ...distract]);
 }
@@ -77,13 +86,14 @@ const picOpt = (w, right) => ({ id: w.w, html: w.emoji, right, emoji: true });
 const textOpt = (id, html, right) => ({ id, html, right, text: true });
 
 // صورة لكلمة تبدأ بالحرف (تتنوع في كل مرة)
-const wordFor = (L) => randomOf(LETTER_WORDS[L.l]);
+const wordFor = (L) => randomOf(LETTER_WORDS[L.l] || []) || { w: L.word, emoji: L.emoji };
 
 // صور لكلمات تبدأ بحروف أخرى، بدون تكرار الصورة
 function otherPics(exceptLetters, n, exceptEmojis = []) {
   const used = new Set(exceptEmojis);
   const out = [];
-  for (const L of shuffle(LETTERS.filter((x) => !exceptLetters.includes(x.l)))) {
+  const except = exceptLetters.flatMap(alikeOf);
+  for (const L of shuffle(START.filter((x) => !except.includes(x.l)))) {
     const w = wordFor(L);
     if (used.has(w.emoji)) continue;
     used.add(w.emoji);
@@ -115,8 +125,8 @@ export const GEN = {
   // ---------------- الحروف ----------------
   letters(level) {
     const pool = LETTERS.slice(...(level.range || [0, LETTERS.length]));
-    const v = variant({ pick: [3, 2], toPic: [2, 2], odd: [2, 1], name: [0, 2] });
     const [target] = store.pickWeighted(pool, (L) => "rec:" + L.l);
+    const v = variant({ pick: [3, 2], toPic: START.includes(target) ? [2, 2] : 0, odd: [2, 1], name: [0, 2] });
 
     if (v === "toPic") {
       const w = wordFor(target);
@@ -201,7 +211,8 @@ export const GEN = {
   // ولا نكتبها للصغار حتى لا يطابق الحرف بالنظر بدل السمع
   first(level) {
     if (level?.mode === "last") {
-      const items = ALL_WORDS.filter((w) => byLetter[w.w.at(-1)]);
+      // نستبعد الكلمات التي لا يُسمع حرفها الأخير (مثل e الصامتة في الإنجليزية)
+      const items = ALL_WORDS.filter((w) => byLetter[w.w.at(-1)] && !LANG.silentEnd?.test(w.w));
       const [w] = store.pickWeighted(items, (x) => "end:" + x.w);
       const t = byLetter[w.w.at(-1)];
       return {
@@ -213,7 +224,7 @@ export const GEN = {
       };
     }
     const v = variant({ first: [3, 2], toPic: [2, 2] });
-    const [target] = store.pickWeighted(LETTERS, (L) => "snd:" + L.l);
+    const [target] = store.pickWeighted(START, (L) => "snd:" + L.l);
     const w = wordFor(target);
     if (v === "toPic") {
       return {
@@ -236,7 +247,7 @@ export const GEN = {
 
   // نفس الصوت: بالصور فقط، بلا حروف ولا كتابة (وعي صوتي خالص)
   sounds() {
-    const pool = LETTERS.filter((L) => LETTER_WORDS[L.l].length >= 2);
+    const pool = START.filter((L) => LETTER_WORDS[L.l].length >= 2);
     const [L] = store.pickWeighted(pool, (x) => "same:" + x.l);
     const [a, b] = pick(LETTER_WORDS[L.l].filter((w, i, arr) => arr.findIndex((y) => y.emoji === w.emoji) === i), 2);
     const others = otherPics([L.l], optionCount() - 1, [a.emoji, b.emoji]);
@@ -292,7 +303,7 @@ export const GEN = {
       const res = v === "add" ? x + y : x - y;
       const choices = shuffle([...new Set([res, res + 1, Math.max(0, res - 1), res + 2])]).slice(0, 4);
       if (!choices.includes(res)) choices[0] = res;
-      const d = (k) => toArabicDigits(k);
+      const d = (k) => contentDigits(k);
       return {
         kind: "choice", key: `${v}:${x}${v === "add" ? "+" : "-"}${y}`, target: String(res),
         promptHtml: v === "add"
@@ -318,7 +329,7 @@ export const GEN = {
       kind: "choice", key: "n:" + t.n, target: String(t.n),
       promptHtml: `<div class="q">عُدّ، كم عددها؟</div><div class="count-box">${Array(t.n).fill(`<span>${e}</span>`).join("")}</div>`,
       say: "كم عددها؟",
-      options: shuffle([t, ...others]).map((n) => ({ id: String(n.n), html: `${n.d}<small>${n.n}</small>`, right: n === t, num: true })),
+      options: shuffle([t, ...others]).map((n) => ({ id: String(n.n), html: n.d === String(n.n) ? n.d : `${n.d}<small>${n.n}</small>`, right: n === t, num: true })),
       praise: `${t.name}! أحسنت`
     };
   },
@@ -427,7 +438,7 @@ export const GEN = {
     const pool = level?.words === "long" ? WORDS_LONG : WORDS_SHORT;
     const [target] = store.pickWeighted(pool, (w) => "sp:" + w.w);
     const chars = [...target.w];
-    const v = variant({ tiles: 3, missing: 2, forms: 2, given: 2 });
+    const v = variant({ tiles: 3, missing: 2, forms: LANG.code === "ar" ? 2 : 0, given: 2 });
     if (v === "missing") {
       const idxs = chars.map((c, i) => (byLetter[c] ? i : -1)).filter((i) => i >= 0);
       const k = randomOf(idxs);
@@ -435,7 +446,7 @@ export const GEN = {
       return {
         kind: "choice", key: "miss:" + target.w, target: t.l,
         promptHtml: `<div class="q">ما الحرف الناقص؟</div><div class="pic small-pic">${target.emoji}</div>
-          <div class="slots">${chars.map((c, i) => `<div class="slot ${i === k ? "gap" : "filled"}">${i === k ? "؟" : c}</div>`).join("")}</div>`,
+          <div class="slots">${chars.map((c, i) => `<div class="slot ${i === k ? "gap" : "filled"}">${i === k ? QM : c}</div>`).join("")}</div>`,
         say: target.w,
         options: letterChoices(t).map((L) => letterOpt(L, t)),
         praise: `أحسنت! ${target.w}`
@@ -524,7 +535,7 @@ export const GEN = {
       const pool = [...new Set(SENTENCES.map((s) => s.s.split(" ").at(-1)))].filter((w) => w !== last);
       return {
         kind: "choice", key: "s:" + target.s, target: last, cols: 3,
-        promptHtml: `<div class="q">أكمل الجملة</div><div class="pic small-pic">${target.pic}</div><div class="sentence">${words.join(" ")} <span class="blank">؟</span></div>`,
+        promptHtml: `<div class="q">أكمل الجملة</div><div class="pic small-pic">${target.pic}</div><div class="sentence">${words.join(" ")} <span class="blank">${QM}</span></div>`,
         say: null,
         options: shuffle([last, ...pick(pool, 2)]).map((w) => ({ id: w, html: w, right: w === last, word: true })),
         praise: target.s
@@ -634,7 +645,7 @@ export const GEN = {
       const [L] = store.pickWeighted(letters, (x) => "hunt:" + x.l);
       const options = texts.filter((t) => {
         const ws = t.split(" ");
-        const hits = ws.filter((w) => w.includes(L.l)).length;
+        const hits = ws.filter((w) => w.toLowerCase().includes(L.l.toLowerCase())).length;
         return hits >= 1 && hits < ws.length && ws.length >= 3;
       });
       if (options.length) return { kind: "hunt", key: "hunt:" + L.l, letter: L, text: randomOf(options) };
@@ -669,10 +680,10 @@ export const GEN = {
     }
     if (mode === "name") {
       const raw = (store.active.name || "").trim().split(/\s+/)[0] || "";
-      const ok = /^[\u0621-\u064A]{2,8}$/.test(raw);
+      const ok = (LANG.nameRe || /^[\u0621-\u064A]{2,8}$/).test(raw);
       const text = ok ? raw : randomOf(WORDS_SHORT).w;
       return { kind: "trace", key: "trn:" + text, text, pic: ok ? store.active.avatar : "",
-        title: ok ? `اكتب اسمك: <b>${text}</b>` : `اكتب كلمة <b>${text}</b> (أضف اسمك بالعربية من ملفك لتكتبه هنا)`,
+        title: ok ? `اكتب اسمك: <b>${text}</b>` : `اكتب كلمة <b>${text}</b> (أضف اسمك ${LANG.nameHint || "بالعربية"} من ملفك لتكتبه هنا)`,
         say: ok ? `اكتب اسمك، ${text}` : text };
     }
     const [target] = store.pickWeighted(LETTERS, (L) => "trc:" + L.l);
@@ -765,7 +776,7 @@ export const GEN = {
         }))
       };
     }
-    const letters = store.pickWeighted(LETTERS, (L) => "snd:" + L.l, pairsCount);
+    const letters = store.pickWeighted(START, (L) => "snd:" + L.l, pairsCount);
     return {
       kind: "memory", key: "mem:" + letters.map((L) => L.l).join(""), title: "طابق كل حرف مع صورة تبدأ به",
       pairs: letters.map((L) => {
@@ -1123,3 +1134,12 @@ const SPELL_GEN = {
     };
   }
 };
+
+// ============================================================
+//  تمارين خاصة بلغة التطبيق (تضيف أو تستبدل مولّدات)
+//  التطبيق العربي لا يضيف شيئاً، وتطبيق الإنجليزية يضيف الـ phonics وغيرها
+// ============================================================
+extendGen(GEN, {
+  variant, letterChoices, distinctPics, letterOpt, picOpt, textOpt, wordFor, otherPics, oddOneOut,
+  big, optionCount, byLetter
+});

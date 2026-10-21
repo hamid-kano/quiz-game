@@ -1,0 +1,10 @@
+{
+  "appId": "app.huroofi.english",
+  "appName": "حروفي English",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#8ecae6",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

@@ -4,6 +4,7 @@ from helpers import async_playwright, BASE, start_server
 
 JS = """async () => {
   const d = await import('./js/data.js');
+  const { LANG } = await import('./js/lang.js');
   const problems = [];
   // المقاطع تعيد تكوين الكلمة (عدا الشدّة التي تُفكّك إلى ساكن + متحرك)
   for (const x of d.SPELL_WORDS) {
@@ -14,21 +15,31 @@ JS = """async () => {
   }
   const e = {}, w = {};
   for (const x of d.ALL_WORDS) { if (e[x.emoji]) problems.push('dup emoji ' + x.emoji); e[x.emoji] = 1; if (w[x.w]) problems.push('dup word ' + x.w); w[x.w] = 1; }
-  for (const [l, v] of Object.entries(d.LETTER_WORDS)) if (v.length < 2) problems.push('few words for ' + l);
+  // في العربية كلمتان على الأقل لكل حرف. في الإنجليزية كلمة على الأقل، إلا x (لا كلمة مناسبة تبدأ بصوته)
+  for (const [l, v] of Object.entries(d.LETTER_WORDS)) if (v.length < (LANG.code === 'ar' ? 2 : l === 'x' ? 0 : 1)) problems.push('few words for ' + l);
+  // كل كلمة في قائمة الحرف تبدأ به فعلاً
+  if (LANG.code !== 'ar') for (const [l, v] of Object.entries(d.LETTER_WORDS)) for (const x of v) if (x.w[0] !== l) problems.push(`${x.w} listed under ${l}`);
+  // كل نشاط له مولّد أو شاشة
+  const { GEN } = await import('./js/exercises.js');
+  const screens = ['stories', 'lesson', 'spellGuide', 'arcade', 'vocab'];
+  for (const a of d.ACTIVITIES) if (!screens.includes(a.type) && !GEN[a.type]) problems.push('no generator for ' + a.id);
   const ids = d.ACTIVITIES.map(a => a.id); ids.forEach((x, i) => ids.indexOf(x) !== i && problems.push('dup activity ' + x));
   return problems;
 }"""
 
-GEN = """async (ages) => {
+GEN = """async () => {
   const { store } = await import('./js/store.js');
   const { GEN } = await import('./js/exercises.js');
   const { ACTIVITIES } = await import('./js/data.js');
-  const KEYS = 'ابتثجحخدذرزسشصضطظعغفقكلمنهويةأإآىءئؤ';
+  const { LANG, ageRank } = await import('./js/lang.js');
+  const ages = LANG.ages.map(a => a.id);
+  const MIN = { all: 0, big: 1, older: 2 };
+  const KEYS = LANG.keyboard.join('');
   const out = { checked: 0, problems: [] };
   for (const age of ages) {
     store.addProfile({ name: 't' + age, age });
     for (const lv of ACTIVITIES) {
-      if (['stories', 'lesson', 'spellGuide', 'arcade'].includes(lv.type) || (age === 'small' && lv.age === 'big')) continue;
+      if (['stories', 'lesson', 'spellGuide', 'arcade'].includes(lv.type) || ageRank(age) < (MIN[lv.age] ?? 0)) continue;
       for (let i = 0; i < 150; i++) {
         let q;
         try { q = GEN[lv.type](lv, i % 4); } catch (err) { out.problems.push(`${lv.id}: THROW ${err.message}`); break; }
@@ -62,7 +73,7 @@ async def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         await pg.goto(BASE); await pg.wait_for_timeout(400)
         content = await pg.evaluate(JS)
-        gen = await pg.evaluate(GEN, ["small", "big"])
+        gen = await pg.evaluate(GEN)
         await b.close()
     print(f"content problems: {content or 'none'}")
     print(f"generated {gen['checked']} questions, problems: {gen['problems'][:10] or 'none'}")

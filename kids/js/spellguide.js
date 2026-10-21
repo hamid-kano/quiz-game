@@ -3,13 +3,14 @@
 // ============================================================
 import { SPELL_LESSONS, ACTIVITIES } from "./data.js";
 import { store } from "./store.js";
+import { ageRank } from "./lang.js";
 import { speak, stopSpeech, sfx } from "./sfx.js";
 import { render, $, $$, esc, toArabicDigits } from "./util.js";
 
 export function screenSpellGuide(back, startActivity, i = 0) {
   const L = SPELL_LESSONS[i];
   const act = ACTIVITIES.find((a) => a.id === L.act);
-  const canPlay = act && (act.age === "all" || store.active.age === "big");
+  const canPlay = act && (act.age === "all" || ageRank(store.active.age) >= 1);
   render(`
     <div class="topbar">
       <button class="icon-btn" id="back" aria-label="رجوع">→</button>

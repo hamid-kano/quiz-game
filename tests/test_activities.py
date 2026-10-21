@@ -26,7 +26,7 @@ async def run_age(browser, age, results, errs):
     pg.on("pageerror", lambda e: errs.append(f"{age}: {e}"))
     await new_kid(pg, age)
     # جلسات أقصر لتسريع الاختبار
-    await pg.evaluate("()=>{const d=JSON.parse(localStorage.getItem('huroofi-v2'));d.settings.rounds=4;localStorage.setItem('huroofi-v2',JSON.stringify(d))}")
+    await pg.evaluate("(k)=>{const d=JSON.parse(localStorage.getItem(k));d.settings.rounds=4;localStorage.setItem(k,JSON.stringify(d))}", H.STORE_KEY)
     await pg.reload(); await pg.wait_for_timeout(400)
     M = await H.maps(pg)
     skills = await pg.evaluate("()=>[...document.querySelectorAll('.skill-card')].map(b=>b.dataset.skill)")
@@ -61,7 +61,8 @@ async def main():
     results, errs = [], []
     async with async_playwright() as p:
         browser = await p.chromium.launch()
-        await asyncio.gather(run_age(browser, "small", results, errs), run_age(browser, "big", results, errs))
+        ages = ["small", "big"] + (["older"] if H.APP == "english" else [])
+        await asyncio.gather(*[run_age(browser, a, results, errs) for a in ages])
         await browser.close()
     fails = [r for r in results if not r[3]]
     print(f"played {len(results)} activities, failed: {[(a, s, x) for a, s, x, _ in fails] or 'none'}")

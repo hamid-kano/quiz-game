@@ -1,0 +1,21 @@
+/* ============================================================
+   تطبيق الإنجليزية: خط Andika للمحتوى (صُمّم لتعليم الأطفال القراءة:
+   a و g بالشكل الذي يُكتب باليد)، واتجاه المحتوى من اليسار لليمين
+   ============================================================ */
+@font-face { font-family: "Andika"; font-weight: 400; font-display: swap; src: url("../fonts/andika-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: "Andika"; font-weight: 700; font-display: swap; src: url("../fonts/andika-latin-700-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+
+:root {
+  --letter-font: "Andika", "Cairo", sans-serif;
+  --cdir: ltr;
+}
+
+/* كل نص يحدد اتجاهه من أول حرف فيه: الجملة الإنجليزية من اليسار، والتعليمات العربية من اليمين */
+.q, .big, .sentence, .riddle, .hint-word, .choice, .vcard b, .theme b, .built-word, .forms b, .ex, .story-pic + .story-text, .rule {
+  unicode-bidi: plaintext;
+}
+.story-text, .en-sentence, .sentence, .riddle, .en-word { direction: ltr; }
+.big.en-word { letter-spacing: .04em; }
+.prompt .big { line-height: 1.25; }
+.learn-card .big { line-height: 1.1; }
+.choice { font-weight: 700; }

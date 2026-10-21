@@ -18,7 +18,7 @@ jobs:
   # الاختبارات الآلية: إذا فشل أي اختبار لا يُنشر التطبيق
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,8 +28,14 @@ jobs:
         run: |
           pip install playwright
           python -m playwright install --with-deps chromium
-      - name: Run tests
+      - name: Build the English app
+        run: node scripts/build-english.mjs
+      - name: Run tests (Arabic app)
         run: python tests/run_all.py
+      - name: Run tests (English app)
+        env:
+          HUROOFI_APP: english
+        run: python tests/run_all.py test_content.py test_layout.py test_speech.py test_activities.py
 
   deploy:
     needs: test
@@ -46,6 +52,8 @@ jobs:
           mkdir -p _site
           cp index.html style.css app.js questions.js _site/
           cp -r kids _site/kids
+          node scripts/build-english.mjs
+          cp -r english/www _site/english
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -5,6 +5,7 @@ import { LETTERS } from "./data.js";
 import { store } from "./store.js";
 import { speak, stopSpeech, speechDone, sfx, canHear, praiseText } from "./sfx.js";
 import { scoreTrace, frameOf, letterGuide, checkOrder, letterLayers } from "./tracecheck.js";
+import { LANG, ageRank } from "./lang.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
 
@@ -122,7 +123,7 @@ function bindCommon(s, sayText, slow = false) {
 
 // بدون صوت عربي في الجهاز: نعرض للأهل ما يجب قراءته للطفل بصوت عالٍ
 function parentNote(text) {
-  if (!text || canHear() || store.active.age !== "small") return "";
+  if (!text || canHear() || ageRank(store.active.age) > 0) return "";
   return `<div class="parent-note">👪 لا يوجد صوت في الجهاز، اقرأ لطفلك: <b>«${esc(text)}»</b></div>`;
 }
 
@@ -247,7 +248,7 @@ function memoryRound(s, q) {
 function huntRound(s, q) {
   const L = q.letter;
   const words = q.text.split(" ");
-  const targets = words.map((w) => w.includes(L.l));
+  const targets = words.map((w) => w.toLowerCase().includes(L.l.toLowerCase()));
   const need = targets.filter(Boolean).length;
   let found = 0;
   let wrongCount = 0;
@@ -341,7 +342,7 @@ function buildRound(s, q) {
   const shown = q.shown || parts;
   const given = q.given || 0;
   const syllables = !!q.parts && q.parts.some((x) => [...x].length > 1);
-  const extra = q.extras || pick(LETTERS.map((x) => x.l).filter((l) => !parts.includes(l)), store.active.age === "big" ? 2 : 1);
+  const extra = q.extras || pick(LETTERS.map((x) => x.l).filter((l) => !parts.includes(l)), ageRank(store.active.age) >= 1 ? 2 : 1);
   const tiles = shuffle([...parts.slice(given), ...extra]);
   let pos = given;
   let wrongCount = 0;
@@ -401,7 +402,7 @@ function buildRound(s, q) {
 }
 
 // ---------- لوحة المفاتيح: اكتب الكلمة كاملة بالضغط على الحروف ----------
-const KEYS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي", "ة", "أ", "إ", "آ", "ى", "ء", "ئ", "ؤ"];
+const KEYS = LANG.keyboard;
 function keyboardRound(s, q) {
   const target = q.word;
   const letters = [...target.w];
@@ -597,6 +598,7 @@ function traceRound(s, q) {
     const t0 = performance.now();
     const BODY = 1700, DOTS = 600;
     const b = lg.box;
+    const ltrDemo = LANG.contentDir === "ltr";
     const step = (now) => {
       if (s.answered || !document.body.contains(guide)) { demoRunning = false; return; }
       const t = now - t0;
@@ -606,13 +608,14 @@ function traceRound(s, q) {
       gctx.save();
       gctx.beginPath();
       if (lg.vertical) gctx.rect(0, 0, size, (b.y0 + (b.y1 - b.y0) * pb) * size + 2);
+      else if (ltrDemo) gctx.rect(0, 0, (b.x0 + (b.x1 - b.x0) * pb) * size + 2, size);
       else { const xr = (b.x1 - (b.x1 - b.x0) * pb) * size - 2; gctx.rect(xr, 0, size - xr, size); }
       gctx.clip();
       gctx.drawImage(body, 0, 0, size, size);
       gctx.restore();
       if (t > BODY) { gctx.globalAlpha = Math.min(1, (t - BODY) / DOTS); gctx.drawImage(dots, 0, 0, size, size); gctx.globalAlpha = 1; }
       // قلم يتبع مقدّمة الرسم
-      const px = lg.vertical ? lg.start.x * size : (b.x1 - (b.x1 - b.x0) * pb) * size;
+      const px = lg.vertical ? lg.start.x * size : (ltrDemo ? b.x0 + (b.x1 - b.x0) * pb : b.x1 - (b.x1 - b.x0) * pb) * size;
       const py = lg.vertical ? (b.y0 + (b.y1 - b.y0) * pb) * size : (lg.start.y + (b.y1 - lg.start.y) * Math.sin(pb * Math.PI) * 0.5) * size;
       if (t <= BODY) { gctx.font = "30px serif"; gctx.textAlign = "center"; gctx.textBaseline = "middle"; gctx.fillText("✏️", px - 4, py - 18); }
       if (t < BODY + DOTS + 400) requestAnimationFrame(step);
@@ -634,7 +637,7 @@ function traceRound(s, q) {
     paintGuide(guideVisible);
     // للصغار، أو لحرف لم يتقنه الطفل بعد: نعرض طريقة كتابته مرة عند البداية
     const m = store.active.mastery["trc:" + text];
-    if (isLetter && guideMode === "full" && (store.active.age === "small" || !m || m.box < 2)) setTimeout(playDemo, 600);
+    if (isLetter && guideMode === "full" && (ageRank(store.active.age) === 0 || !m || m.box < 2)) setTimeout(playDemo, 600);
   }).catch(() => {});
   $("#demo")?.addEventListener("click", () => { sfx.tap(); playDemo(); });
   $("#peek")?.addEventListener("click", () => { guideVisible = true; showGuide(); });
@@ -747,7 +750,7 @@ export function showLesson(level, onDone, onExit, i = 0) {
     </div>
     <div class="prompt learn-card">
       <div class="big">${L.l}</div>
-      <button class="speak" id="say">🔊 حرف ${L.name}</button>
+      <button class="speak" id="say">🔊 ${LANG.letterWord} ${L.name}</button>
       <div class="forms">${letterForms(L).map(([n, f]) => `<div><b>${f}</b><small>${n}</small></div>`).join("")}</div>
       <button class="example" id="example"><span class="pic">${L.emoji}</span>${L.word}</button>
     </div>
@@ -758,7 +761,7 @@ export function showLesson(level, onDone, onExit, i = 0) {
         : `<button class="btn small" id="play">يلا نلعب 🎮</button>`}
     </div>
   `);
-  const say = () => speak(`حرف ${L.name}، ${L.word}`);
+  const say = () => speak(L.say || `حرف ${L.name}، ${L.word}`);
   $("#say").onclick = say;
   $("#example").onclick = () => speak(L.word);
   say();

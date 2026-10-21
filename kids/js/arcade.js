@@ -2,13 +2,15 @@
 //  ألعاب حروفي: لعبة لكل قسم تنمّي مهارته بطريقة يحبها الأطفال
 //  محرك مشترك: الوقت، النقاط، الأخطاء، التكرار الذكي. لا خسارة في أي لعبة.
 // ============================================================
-import { LETTERS, SIMILAR_GROUPS, LETTER_WORDS, ALL_WORDS, SPELL_WORDS, CATEGORIES, HARAKAT } from "./data.js";
+import { LETTERS, SIMILAR_GROUPS, LETTER_WORDS, ALL_WORDS, SPELL_WORDS, CATEGORIES, HARAKAT, NUMBERS, SHOP_ITEMS } from "./data.js";
 import { store } from "./store.js";
+import { LANG, ageRank } from "./lang.js";
 import { speak, stopSpeech, speechDone, sfx, canHear } from "./sfx.js";
-import { render, $, $$, esc, shuffle, pick, randomOf, toArabicDigits } from "./util.js";
+import { render, $, $$, esc, shuffle, pick, randomOf, toArabicDigits, contentDigits } from "./util.js";
 import { placeText } from "./tracecheck.js";
 
-const big = () => store.active.age === "big";
+// «كبير» تعني 6 سنوات فما فوق (تشمل فئة 9–12 في تطبيق الإنجليزية)
+const big = () => ageRank(store.active.age) >= 1;
 const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
 const groupOf = (l) => SIMILAR_GROUPS.find((g) => g.includes(l)) || [];
 
@@ -159,7 +161,7 @@ const GAMES = {
         let w;
         if (isTarget) { w = randomOf(LETTER_WORDS[target.l]); sinceTarget = 0; }
         else {
-          const L = randomOf(LETTERS.filter((x) => x !== target && !groupOf(target.l).includes(x.l)));
+          const L = randomOf(LETTERS.filter((x) => x !== target && !groupOf(target.l).includes(x.l) && LETTER_WORDS[x.l]?.length && !(target.alike || []).includes(x.l)));
           w = randomOf(LETTER_WORDS[L.l]);
           sinceTarget++;
         }
@@ -272,14 +274,15 @@ const GAMES = {
     goal: () => (big() ? 6 : 4),
     start(st) {
       const stage = st.stage;
-      const marks = ["َ", "ُ", "ِ"];
+      // البديل الخاطئ: تغيير الحركة في العربية، أو تغيير حرف العلة في الإنجليزية
+      const marks = LANG.code === "ar" ? ["َ", "ُ", "ِ"] : ["a", "e", "i", "o", "u"];
       const alt = (sy) => {
         const m = [...sy].find((c) => marks.includes(c));
         return m ? sy.replace(m, randomOf(marks.filter((x) => x !== m))) : null;
       };
       const pool = big()
         ? SPELL_WORDS
-        : SPELL_WORDS.filter((w) => w.syl.length === 2 && (w.type === "madd" || w.type === "sukun"));
+        : SPELL_WORDS.filter((w) => w.easy ?? (w.syl.length === 2 && (w.type === "madd" || w.type === "sukun")));
       const nextWord = () => {
         stage.innerHTML = "";
         const [w] = store.pickWeighted(pool, (x) => "tj:" + x.w);
@@ -388,9 +391,10 @@ const GAMES = {
         for (let i = 0; i < N * N; i++) if (coreData[i * 4 + 3] > 40) coreCells.push(i);
         const covered = new Set();
 
-        // نقطة البداية: أعلى يمين الحرف (اتجاه الكتابة العربية)
+        // نقطة البداية: أعلى الحرف من جهة الكتابة (يمين في العربية، يسار في الإنجليزية)
         let start = null;
-        for (let gx = N - 1; gx >= 0 && !start; gx--) for (let gy = 0; gy < N; gy++) {
+        const ltr = LANG.contentDir === "ltr";
+        for (let k = 0; k < N && !start; k++) for (let gy = 0, gx = ltr ? k : N - 1 - k; gy < N; gy++) {
           if (coreData[(gy * N + gx) * 4 + 3] > 40) { start = { x: ((gx + 0.5) / N) * size, y: ((gy + 0.5) / N) * size }; break; }
         }
         const car = el(wrap, "car", "🚗");
@@ -640,19 +644,17 @@ const GAMES = {
     goal: () => 5,
     start(st) {
       const stage = st.stage;
-      const ITEMS = [
-        ["تفاحة", "🍎"], ["موزة", "🍌"], ["كرة", "⚽"], ["دمية", "🧸"], ["بالون", "🎈"], ["كعكة", "🍰"],
-        ["عصير", "🧃"], ["قلم", "✏️"], ["كتاب", "📖"], ["بوظة", "🍦"], ["بسكويت", "🍪"], ["سيارة صغيرة", "🚗"]
-      ];
+      const ITEMS = SHOP_ITEMS;
       const COINS = big() ? [1, 2, 5] : [1];
-      const AR = ["صفر", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة"];
+      // أسماء الأعداد من محتوى اللغة نفسها
+      const AR = [NUMBERS[0]?.zero || "صفر", ...NUMBERS.slice(0, 10).map((x) => x.name)];
       const nextItem = () => {
         stage.innerHTML = "";
         const [name, e] = randomOf(ITEMS);
         const prices = big() ? [3, 4, 5, 6, 7, 8, 9, 10] : [1, 2, 3, 4, 5];
         const [price] = store.pickWeighted(prices, (p) => "shop:" + p);
         st.setTask(`<span>ادفع ثمن ${name} بالضبط</span>`, `${name} بـ ${AR[price]}. ادفع ثمنها بالضبط`);
-        const shelf = el(stage, "shelf", `<span class="sitem">${e}</span><span class="tag">${toArabicDigits(price)} <small>${"🪙".repeat(Math.min(price, 5))}${price > 5 ? "…" : ""}</small></span>`);
+        const shelf = el(stage, "shelf", `<span class="sitem">${e}</span><span class="tag">${contentDigits(price)} <small>${"🪙".repeat(Math.min(price, 5))}${price > 5 ? "…" : ""}</small></span>`);
         const tray = el(stage, "tray", `<small>المدفوع: <b id="paid">٠</b></small><div class="paid" id="paidc"></div>`);
         const wallet = el(stage, "wallet", "");
         const pay = el(stage, "paybtn", "💰 ادفع");
@@ -660,16 +662,16 @@ const GAMES = {
         let tries = 0;
         const sum = () => paid.reduce((a, b) => a + b, 0);
         const paint = () => {
-          $("#paid").textContent = toArabicDigits(sum());
+          $("#paid").textContent = contentDigits(sum());
           const pc = $("#paidc");
           pc.innerHTML = "";
           paid.forEach((v, i) => {
-            const c = el(pc, `coin c${v}`, toArabicDigits(v));
+            const c = el(pc, `coin c${v}`, contentDigits(v));
             c.addEventListener("pointerdown", (ev) => { ev.preventDefault(); paid.splice(i, 1); sfx.tap(); paint(); });
           });
         };
         COINS.forEach((v) => {
-          const c = el(wallet, `coin big c${v}`, toArabicDigits(v));
+          const c = el(wallet, `coin big c${v}`, contentDigits(v));
           c.addEventListener("pointerdown", (ev) => {
             ev.preventDefault();
             if (paid.length >= 12) return;

@@ -4,9 +4,11 @@
 // ============================================================
 import { today, daysBetween, uid, randomOf } from "./util.js";
 import { STICKERS, DEFAULT_ROUNDS } from "./data.js";
+import { LANG } from "./lang.js";
 
-const KEY = "huroofi-v2";
-const OLD_KEY = "huroofi-progress-v1";
+// كل تطبيق (عربي/إنجليزي) له مفتاح تخزين خاص حتى لا تختلط ملفات الأطفال
+const KEY = LANG.storageKey;
+const OLD_KEY = LANG.legacyKey || "";
 
 // صناديق التكرار (نظام لايتنر): كلما ارتفع الصندوق قلّ ظهور العنصر
 // 0 = جديد أو أخطأ فيه مؤخراً، 4 = متقن

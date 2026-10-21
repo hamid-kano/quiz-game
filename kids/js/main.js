@@ -15,9 +15,13 @@ import { screenSpellGuide } from "./spellguide.js";
 import { runArcade } from "./arcade.js";
 import { screenVocab } from "./vocab.js";
 import { isNative, setupBackButton } from "./native.js";
+import { LANG, ageRank, ageInfo } from "./lang.js";
 
 // ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
-const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
+// النشاط يناسب الطفل إذا كان عمره بين أصغر فئة (age) وأكبر فئة (upTo) للنشاط
+const MIN_AGE = { all: 0, big: 1, older: 2 };
+const fitsAge = (a, p = store.active) =>
+  ageRank(p.age) >= (MIN_AGE[a.age] ?? 0) && (a.upTo == null || ageRank(p.age) <= ageRank(a.upTo));
 
 export function skillsFor(p = store.active) {
   return SKILLS
@@ -41,15 +45,15 @@ export function screenProfiles() {
   const list = store.profiles;
   if (!list.length) return screenEditProfile();
   render(`
-    <div class="mascot">🦉</div>
-    <h1>حروفي</h1>
+    <div class="mascot">${LANG.mascot}</div>
+    <h1>${LANG.appName}</h1>
     <p class="sub">من سيلعب الآن؟</p>
     <div class="profiles">
       ${list.map((p) => `
         <button class="profile-card" data-id="${p.id}">
           <span class="avatar">${p.avatar}</span>
           <b>${esc(p.name || "بطل")}</b>
-          <small>⭐ ${store.totalStars(p)} · ${p.age === "small" ? "صغير" : "كبير"}</small>
+          <small>⭐ ${store.totalStars(p)} · ${ageInfo(p.age).name}</small>
         </button>`).join("")}
       ${list.length < 6 ? `<button class="profile-card add" id="add"><span class="avatar">➕</span><b>طفل جديد</b></button>` : ""}
     </div>
@@ -78,13 +82,11 @@ export function screenEditProfile(id = null, back = null) {
     <p class="label">اختر شخصيتك</p>
     <div class="avatars">${AVATARS.map((a) => `<button class="av ${a === st.avatar ? "active" : ""}" data-a="${a}">${a}</button>`).join("")}</div>
     <p class="label">كم عمرك؟</p>
-    <div class="age-cards">
-      <button class="age-card ${st.age === "small" ? "active" : ""}" data-age="small">
-        <span class="e">🐣</span><b>صغير</b><span>من 3 إلى 5 سنوات</span>
-      </button>
-      <button class="age-card ${st.age === "big" ? "active" : ""}" data-age="big">
-        <span class="e">🦁</span><b>كبير</b><span>من 6 إلى 8 سنوات</span>
-      </button>
+    <div class="age-cards ${LANG.ages.length === 3 ? "three" : ""}">
+      ${LANG.ages.map((a) => `
+      <button class="age-card ${st.age === a.id ? "active" : ""}" data-age="${a.id}">
+        <span class="e">${a.e}</span><b>${a.name}</b><span>${a.range}</span>
+      </button>`).join("")}
     </div>
     <button class="btn block" id="go">${p ? "حفظ ✔" : "يلا نبدأ 🚀"}</button>
   `);

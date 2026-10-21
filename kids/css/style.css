@@ -26,6 +26,8 @@
   --shadow: #b8cfe0;
   --radius: 24px;
   --letter-font: "Naskh", "Cairo", serif;
+  /* اتجاه المحتوى (الحروف والكلمات): يتغيّر في تطبيق الإنجليزية عبر css/lang.css */
+  --cdir: rtl;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -246,7 +248,7 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .trace-actions { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
 
 /* تركيب الكلمة */
-.slots { display: flex; justify-content: center; gap: 8px; margin: 12px 0 4px; direction: rtl; flex-wrap: wrap; }
+.slots { display: flex; justify-content: center; gap: 8px; margin: 12px 0 4px; direction: var(--cdir); flex-wrap: wrap; }
 .slot {
   width: 56px; height: 64px; border-radius: 16px; background: var(--sky-2);
   border: 3px dashed #9cc3dc; display: grid; place-items: center; font-family: var(--letter-font); font-size: 34px;
@@ -453,7 +455,7 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .mface.letter.alt { color: var(--purple); }
 .mgroup { font-size: 20px; line-height: 1.2; padding: 4px; word-break: break-all; text-align: center; }
 
-.hunt { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; direction: rtl; }
+.hunt { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; direction: var(--cdir); }
 .hword {
   border: 0; background: #fff; border-radius: 16px; padding: 8px 16px; cursor: pointer; color: var(--ink);
   font-family: var(--letter-font); font-size: 32px; box-shadow: 0 5px 0 var(--shadow);
@@ -549,7 +551,7 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .slot.good { border-color: var(--good); background: #e5f8ee; }
 .slot.bad { border-color: var(--bad); background: #fde6ec; animation: shake .4s; }
 .kb-slots .slot { width: 46px; height: 56px; font-size: 30px; }
-.keyboard { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; direction: rtl; }
+.keyboard { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; direction: var(--cdir); }
 .key {
   aspect-ratio: 1 / 1.15; border: 0; border-radius: 12px; background: #fff; color: var(--ink); cursor: pointer;
   font-family: var(--letter-font); font-size: 24px; box-shadow: 0 4px 0 var(--shadow); padding: 0;
@@ -783,3 +785,11 @@ h1 { font-size: clamp(26px, 9vw, 36px); }
   .board { grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .album { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+
+/* معنى الكلمة بالعربية (تطبيق الإنجليزية) */
+.vcard .mean { font-size: 13px; color: #6b7f95; line-height: 1.3; }
+/* بطاقات الأعمار: ثلاث فئات في سطر واحد */
+.age-cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.age-cards.three .age-card .e { font-size: clamp(28px, 9vw, 40px); }
+.age-cards.three .age-card span { font-size: 12px; }
+.story-ar { font-size: 18px; color: #4a6380; margin: 6px 0 0; background: #f3f7fb; border-radius: 12px; padding: 6px 10px; }
