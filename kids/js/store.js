@@ -190,6 +190,18 @@ class Store {
     return { before, after: p.stars[levelId] };
   }
 
+  // إتقان مهارة: مجموع (صندوق كل عنصر ÷ 4) لكل العناصر التابعة لها، مقسوماً على هدف المهارة
+  skillProgress(skill, p = this.active) {
+    let sum = 0;
+    let seen = 0;
+    for (const [k, m] of Object.entries(p.mastery)) {
+      if (!skill.prefixes.some((pre) => k.startsWith(pre))) continue;
+      sum += Math.min(m.box, MAX_BOX) / MAX_BOX;
+      seen++;
+    }
+    return { value: Math.min(1, sum / skill.target), seen };
+  }
+
   totalStars(p = this.active) { return Object.values(p.stars).reduce((a, b) => a + b, 0); }
 
   // ---------- الملصقات ----------

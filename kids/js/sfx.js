@@ -17,14 +17,17 @@ if ("speechSynthesis" in window) {
 
 export const hasArabicVoice = () => !!arVoice;
 
-export function speak(text) {
-  if (!store.settings.speech || !("speechSynthesis" in window)) return;
+export const canHear = () => store.settings.speech && !!arVoice;
+
+// slow = نطق أبطأ (للتمارين الصوتية عند الصغار)
+export function speak(text, { slow = false } = {}) {
+  if (!text || !store.settings.speech || !("speechSynthesis" in window)) return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = arVoice?.lang || "ar-SA";
     if (arVoice) u.voice = arVoice;
-    u.rate = 0.8;
+    u.rate = slow ? 0.55 : 0.8;
     u.pitch = 1.1;
     speechSynthesis.speak(u);
   } catch { /* غير مدعوم */ }

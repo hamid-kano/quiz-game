@@ -1,32 +1,29 @@
 // ============================================================
 //  الشاشات الرئيسية والتنقل بينها
+//  الفلسفة: كل قسم ينمّي مهارة واحدة، والطفل يتنقّل بحرية بين الأقسام
 // ============================================================
-import { LEVELS, LETTERS, AVATARS, STICKERS, LOCK_LEVELS } from "./data.js";
+import { SKILLS, ACTIVITIES, LETTERS, AVATARS, STICKERS } from "./data.js";
 import { store } from "./store.js";
 import { speak, sfx, confetti } from "./sfx.js";
-import { render, $, $$, esc, toast, randomOf, plural } from "./util.js";
+import { render, $, $$, esc, toast, randomOf, plural, toArabicDigits } from "./util.js";
 import { GEN, runSession, showLesson } from "./games.js";
-import { DAILY_TYPES } from "./exercises.js";
 import { screenParents } from "./parents.js";
 import { CERTIFICATES, checkCertificates, screenCertificate } from "./rewards.js";
 import { screenStories } from "./stories.js";
 import { screenGarden } from "./garden.js";
 
-// ---------- المستويات ----------
-export function visibleLevels(p = store.active) {
-  return p.age === "small" ? LEVELS.filter((l) => l.age === "small") : LEVELS;
+// ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
+const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
+
+export function skillsFor(p = store.active) {
+  return SKILLS
+    .map((sk) => ({ ...sk, activities: sk.activities.filter((a) => fitsAge(a, p)) }))
+    .filter((sk) => sk.activities.length);
 }
 
-function isUnlocked(level, p = store.active) {
-  if (!LOCK_LEVELS) return true;
-  const list = visibleLevels(p);
-  const i = list.indexOf(level);
-  if (i <= 0) return true;
-  if (p.age === "big" && level.age === "small") return true;
-  if (p.age === "big" && level === list.find((l) => l.age === "big")) return true;
-  return (p.stars[list[i - 1].id] || 0) > 0;
-}
-
+export const activitiesFor = (p = store.active) => ACTIVITIES.filter((a) => fitsAge(a, p));
+const skillOf = (a) => SKILLS.find((s) => s.id === a.skill);
+const pct = (v) => Math.round(v * 100);
 const starsText = (n) => "⭐".repeat(n) + "☆".repeat(3 - n);
 
 function starsFor(mistakes, total) {
@@ -58,7 +55,7 @@ export function screenProfiles() {
     store.setActive(b.dataset.id);
     const p = store.active;
     speak(p.name ? `أهلاً ${p.name}` : "أهلاً بك");
-    screenMap();
+    screenHome();
   }));
   $("#add")?.addEventListener("click", () => screenEditProfile());
 }
@@ -102,38 +99,20 @@ export function screenEditProfile(id = null, back = null) {
   $("#go").onclick = () => {
     if (!st.age) { toast("اختر العمر أولاً 👆"); return; }
     st.name = $("#kid-name").value.trim();
-    if (p) { store.updateProfile(p.id, st); toast("تم الحفظ"); return back ? back() : screenMap(); }
+    if (p) { store.updateProfile(p.id, st); toast("تم الحفظ"); return back ? back() : screenHome(); }
     store.addProfile(st);
     speak(st.name ? `أهلاً ${st.name}` : "أهلاً بك");
-    screenMap();
+    screenHome();
   };
 }
 
-// ---------- خريطة المستويات ----------
-export function screenMap() {
+// ---------- الشاشة الرئيسية: الأقسام ----------
+export function screenHome() {
   const p = store.active;
   if (!p) return screenProfiles();
-  const list = visibleLevels();
-  const current = list.find((l) => isUnlocked(l) && !p.stars[l.id]);
   const streak = store.currentStreak();
   const dailyDone = store.dailyDoneToday();
-  let lastAge = null;
-
-  const items = list.map((l, i) => {
-    const unlocked = isUnlocked(l);
-    const s = p.stars[l.id] || 0;
-    let head = "";
-    if (p.age === "big" && l.age !== lastAge) {
-      head = `<div class="section-title">${l.age === "small" ? "🐣 الأساسيات" : "🦁 مستويات الكبار"}</div>`;
-      lastAge = l.age;
-    }
-    return `${head}
-      <button class="level ${unlocked ? "" : "locked"} ${l === current ? "current" : ""}" data-id="${l.id}">
-        <span class="num">${unlocked ? l.icon : "🔒"}</span>
-        <span class="info"><b>${i + 1}. ${l.title}</b><small>${l.desc}</small></span>
-        <span class="lstars" aria-label="${s} نجوم">${unlocked ? starsText(s) : ""}</span>
-      </button>`;
-  }).join("");
+  const skills = skillsFor();
 
   render(`
     <div class="topbar">
@@ -148,112 +127,159 @@ export function screenMap() {
       <span class="d-icon">${dailyDone ? "✅" : "📅"}</span>
       <span class="d-info">
         <b>تحدّي اليوم</b>
-        <small>${dailyDone ? "أنجزته اليوم! عد غداً 🔥" : "8 أسئلة من الأشياء التي تحتاج تمريناً"}</small>
+        <small>${dailyDone ? "أنجزته اليوم! عد غداً 🔥" : "8 أسئلة من المهارات التي تحتاج تمريناً"}</small>
       </span>
       <span class="d-go">${dailyDone ? "🔁" : "▶"}</span>
     </button>
 
+    <div class="skills">
+      ${skills.map((sk) => {
+        const pr = store.skillProgress(sk);
+        return `<button class="skill-card" data-skill="${sk.id}" style="--c:${sk.color}">
+          <span class="sk-icon">${sk.icon}</span>
+          <b>${sk.name}</b>
+          <span class="meter" aria-label="الإتقان ${pct(pr.value)}٪"><i style="width:${Math.max(4, pct(pr.value))}%"></i></span>
+          <small>${pr.seen ? `${toArabicDigits(pct(pr.value))}٪ إتقان` : "ابدأ هنا"}</small>
+        </button>`;
+      }).join("")}
+    </div>
+
     <div class="quick">
       <button class="quick-btn" id="garden">🌷<span>حديقتي</span><small>الحروف</small></button>
       <button class="quick-btn" id="album">🎁<span>ألبومي</span><small>${p.stickers.length}/${STICKERS.length}</small></button>
-      <button class="quick-btn" id="certs">📜<span>شهاداتي</span><small>${p.certificates.length}/${CERTIFICATES.length}</small></button>
+      <button class="quick-btn" id="certs">📜<span>شهاداتي</span><small>${CERTIFICATES.filter((c) => p.certificates.includes(c.id)).length}/${CERTIFICATES.length}</small></button>
       <button class="quick-btn" id="parents">👪<span>للأهل</span><small>التقرير</small></button>
     </div>
-
-    <div class="map">${items}</div>
   `);
 
   $("#who").onclick = screenProfiles;
   $("#daily").onclick = startDaily;
   $("#album").onclick = screenAlbum;
-  $("#garden").onclick = () => screenGarden(screenMap);
+  $("#garden").onclick = () => screenGarden(screenHome);
   $("#certs").onclick = screenCertificates;
-  $("#parents").onclick = () => screenParents(screenMap);
-  $$(".level").forEach((b) => (b.onclick = () => {
-    const level = LEVELS.find((l) => l.id === b.dataset.id);
-    if (!isUnlocked(level)) { sfx.wrong(); toast("أكمل المستوى السابق أولاً 🔒"); return; }
+  $("#parents").onclick = () => screenParents(screenHome);
+  $$(".skill-card").forEach((b) => (b.onclick = () => { sfx.tap(); screenSkill(b.dataset.skill); }));
+}
+
+// للتوافق مع الشاشات الأخرى
+export const screenMap = screenHome;
+
+// ---------- شاشة القسم: أنشطة مهارة واحدة ----------
+export function screenSkill(skillId) {
+  const p = store.active;
+  const sk = skillsFor().find((s) => s.id === skillId);
+  if (!sk) return screenHome();
+  const pr = store.skillProgress(sk);
+  speak(sk.name);
+
+  render(`
+    <div class="topbar">
+      <button class="icon-btn" id="back" aria-label="رجوع">→</button>
+      <b>${sk.icon} ${sk.name}</b>
+      <span class="spacer"></span>
+    </div>
+    <div class="skill-head" style="--c:${sk.color}">
+      <p>${sk.goal}</p>
+      <span class="meter big"><i style="width:${Math.max(3, pct(pr.value))}%"></i></span>
+      <small>الإتقان: ${toArabicDigits(pct(pr.value))}٪</small>
+    </div>
+    <div class="activities">
+      ${sk.activities.map((a) => {
+        const s = p.stars[a.id] || 0;
+        return `<button class="activity" data-id="${a.id}" style="--c:${sk.color}">
+          <span class="num">${a.icon}</span>
+          <span class="info"><b>${a.title}</b><small>${a.desc}</small></span>
+          <span class="lstars">${a.type === "lesson" ? "📖" : starsText(s)}</span>
+        </button>`;
+      }).join("")}
+    </div>
+  `);
+  $("#back").onclick = screenHome;
+  $$(".activity").forEach((b) => (b.onclick = () => {
     sfx.tap();
-    startLevel(level);
+    startActivity(ACTIVITIES.find((a) => a.id === b.dataset.id));
   }));
-  if (current && store.totalStars()) setTimeout(() => document.querySelector(".level.current")?.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
 }
 
-// ---------- تشغيل مستوى ----------
-export function startLevel(level) {
-  if (level.type === "stories") return screenStories(screenMap, finishStory);
+// ---------- تشغيل نشاط ----------
+export function startActivity(act) {
+  const back = () => screenSkill(act.skill);
+  if (act.type === "stories") return screenStories(back, (st, r) => finishStory(st, r, act));
+  if (act.type === "lesson") return screenBoard(act);
   const total =
-    level.type === "trace" ? Math.min(4, store.settings.rounds)
-    : level.type === "memory" ? 3
-    : level.type === "order" ? Math.min(4, store.settings.rounds)
+    act.type === "trace" ? Math.min(4, store.settings.rounds)
+    : act.type === "memory" ? 3
+    : act.type === "order" ? Math.min(4, store.settings.rounds)
     : store.settings.rounds;
-  const go = () => runSession({
-    title: level.title,
-    icon: level.icon,
+  runSession({
+    title: act.title,
+    icon: act.icon,
     total,
-    next: () => GEN[level.type](level),
-    onExit: screenMap,
-    onFinish: (r) => finishLevel(level, r)
-  });
-  // الدرس يظهر في أول مرة فقط، ويمكن فتحه لاحقاً من زر المراجعة
-  if (level.type === "letters" && !store.active.plays[level.id]) showLesson(level, go, screenMap);
-  else go();
-}
-
-function finishLevel(level, r) {
-  const stars = starsFor(r.mistakes, r.total);
-  const { before, after } = store.finishLevel(level.id, stars);
-  const rewards = [];
-  if (before === 0 && after > 0) rewards.push(store.awardSticker());
-  if (before < 3 && after === 3) rewards.push(store.awardSticker());
-  const certs = checkCertificates();
-
-  const list = visibleLevels();
-  const next = list[list.indexOf(level) + 1];
-  showResult({
-    stars,
-    r,
-    stickers: rewards.filter(Boolean),
-    certs,
-    title: stars === 3 ? "ممتاز! أنت بطل 🏆" : stars === 2 ? "أحسنت! 👏" : "جيد! جرّب مرة أخرى لتحصل على نجوم أكثر",
-    primary: next && isUnlocked(next) ? { label: `المستوى التالي ${next.icon}`, run: () => startLevel(next) } : null,
-    again: () => startLevel(level),
-    extra: level.type === "letters" ? { label: "📚 راجع الدرس", run: () => showLesson(level, () => startLevel(level), screenMap) } : null
+    next: () => GEN[act.type](act),
+    onExit: back,
+    onFinish: (r) => finishActivity(act, r)
   });
 }
 
-function finishStory(st, r) {
-  const stars = starsFor(r.mistakes, r.total);
-  const { before, after } = store.finishLevel("story-" + st.id, stars);
-  store.finishLevel("stories", stars);
+// للتوافق: كان اسمها startLevel
+export const startLevel = startActivity;
+
+function rewardsFor(id, stars) {
+  const { before, after } = store.finishLevel(id, stars);
   const stickers = [];
   if (before === 0 && after > 0) stickers.push(store.awardSticker());
   if (before < 3 && after === 3) stickers.push(store.awardSticker());
+  return stickers.filter(Boolean);
+}
+
+function finishActivity(act, r) {
+  const stars = starsFor(r.mistakes, r.total);
+  const stickers = rewardsFor(act.id, stars);
+  const sk = skillsFor().find((s) => s.id === act.skill);
+  const list = sk.activities.filter((a) => a.type !== "lesson");
+  const next = list[(list.findIndex((a) => a.id === act.id) + 1) % list.length];
+  const pr = store.skillProgress(sk);
   showResult({
-    stars,
-    r,
-    stickers: stickers.filter(Boolean),
+    stars, r, stickers,
     certs: checkCertificates(),
-    title: stars === 3 ? "فهمت القصة تماماً! 📚" : "أحسنت القراءة! 👏",
-    primary: { label: "📚 قصة أخرى", run: () => screenStories(screenMap, finishStory) },
-    again: () => screenStories(screenMap, finishStory)
+    title: stars === 3 ? "ممتاز! أنت بطل 🏆" : stars === 2 ? "أحسنت! 👏" : "جيد! جرّب مرة أخرى لتحصل على نجوم أكثر",
+    note: `<div class="skill-note" style="--c:${sk.color}">${sk.icon} مهارة ${sk.name}: ${toArabicDigits(pct(pr.value))}٪ <span class="meter"><i style="width:${Math.max(3, pct(pr.value))}%"></i></span></div>`,
+    primary: next && next.id !== act.id ? { label: `${next.icon} ${next.title}`, run: () => startActivity(next) } : null,
+    again: () => startActivity(act),
+    home: { label: `${sk.icon} قسم ${sk.name}`, run: () => screenSkill(sk.id) }
   });
 }
 
-function showResult({ stars, r, stickers, certs, title, primary, again, extra, note = "" }) {
+function finishStory(st, r, act) {
+  const stars = starsFor(r.mistakes, r.total);
+  const stickers = rewardsFor("story-" + st.id, stars);
+  store.finishLevel(act.id, stars);
+  const back = () => screenSkill(act.skill);
+  showResult({
+    stars, r, stickers,
+    certs: checkCertificates(),
+    title: stars === 3 ? "فهمت القصة تماماً! 📚" : "أحسنت القراءة! 👏",
+    primary: { label: "📚 قصة أخرى", run: () => screenStories(back, (s2, r2) => finishStory(s2, r2, act)) },
+    again: () => screenStories(back, (s2, r2) => finishStory(s2, r2, act)),
+    home: { label: "🧠 قسم الفهم واللغة", run: back }
+  });
+}
+
+function showResult({ stars, r, stickers, certs, title, primary, again, home, note = "" }) {
+  home = home || { label: "🏠 الرئيسية", run: screenHome };
   render(`
     <div class="result">
       <div class="mascot">${stars === 3 ? "🥳" : stars === 2 ? "😄" : "🙂"}</div>
       <h1>${title}</h1>
       <div class="stars" aria-label="${stars} نجوم">${[1, 2, 3].map((n) => `<span class="${n <= stars ? "" : "off"}">⭐</span>`).join("")}</div>
-      <p class="sub">${r.firstTry} من ${r.total} من المحاولة الأولى</p>
+      <p class="sub">${toArabicDigits(r.firstTry)} من ${toArabicDigits(r.total)} من المحاولة الأولى</p>
       ${note}
       ${stickers.map((s) => `<div class="reward"><span class="sticker-big">${s.e}</span><b>ملصق جديد: ${s.n}!</b><small>تجده في ألبومك 🎁</small></div>`).join("")}
       ${certs.map((c) => `<button class="reward cert" data-cert="${c.id}"><span class="sticker-big">📜</span><b>شهادة جديدة: ${c.title}</b><small>اضغط لعرضها وطباعتها</small></button>`).join("")}
       <div class="result-actions">
-        ${primary ? `<button class="btn block" id="primary">${primary.label}</button>` : ""}
+        ${primary ? `<button class="btn block" id="primary">التالي: ${primary.label}</button>` : ""}
         <button class="btn alt block" id="again">العب مرة أخرى 🔁</button>
-        ${extra ? `<button class="btn alt block" id="extra">${extra.label}</button>` : ""}
-        <button class="btn alt block" id="map">الخريطة 🗺️</button>
+        <button class="btn alt block" id="map">${home.label}</button>
       </div>
     </div>
   `);
@@ -263,23 +289,55 @@ function showResult({ stars, r, stickers, certs, title, primary, again, extra, n
   speak(stars === 3 ? "ممتاز! أنت بطل" : stars === 2 ? "أحسنت" : "جيد، حاول مرة أخرى");
   primary && ($("#primary").onclick = primary.run);
   $("#again").onclick = again;
-  extra && ($("#extra").onclick = extra.run);
-  $("#map").onclick = screenMap;
-  $$("[data-cert]").forEach((b) => (b.onclick = () => screenCertificate(CERTIFICATES.find((c) => c.id === b.dataset.cert), screenMap)));
+  $("#map").onclick = home.run;
+  $$("[data-cert]").forEach((b) => (b.onclick = () => screenCertificate(CERTIFICATES.find((c) => c.id === b.dataset.cert), screenHome)));
 }
 
-// ---------- التحدي اليومي ----------
-const ALL_LETTERS_LEVEL = { range: [0, LETTERS.length] };
+// ---------- لوحة الحروف ----------
+function screenBoard(act) {
+  const back = () => screenSkill(act.skill);
+  render(`
+    <div class="topbar">
+      <button class="icon-btn" id="back" aria-label="رجوع">→</button>
+      <b>📋 لوحة الحروف</b>
+      <span class="spacer"></span>
+    </div>
+    <p class="sub">اضغط على أي حرف لتتعرّف عليه</p>
+    <div class="board">${LETTERS.map((L, i) => `<button class="bl" data-i="${i}">${L.l}</button>`).join("")}</div>
+  `);
+  $("#back").onclick = back;
+  $$(".bl").forEach((b) => (b.onclick = () => {
+    sfx.tap();
+    const i = Number(b.dataset.i);
+    const all = { range: [0, LETTERS.length], icon: "📋" };
+    // بعد الدرس ننتقل لتمرين المجموعة التي فيها الحرف
+    const group = ACTIVITIES.find((a) => a.type === "letters" && i >= a.range[0] && i < a.range[1]);
+    showLesson(all, () => startActivity(group), () => screenBoard(act), i);
+  }));
+}
 
+// ---------- التحدي اليومي: يركّز على المهارات الأضعف ----------
 function startDaily() {
-  const types = DAILY_TYPES[store.active.age];
   const alreadyDone = store.dailyDoneToday();
+  const playable = skillsFor().map((sk) => ({
+    sk,
+    acts: sk.activities.filter((a) => !["lesson", "stories", "trace", "memory", "order"].includes(a.type))
+  })).filter((x) => x.acts.length);
+
+  // المهارة الأقل إتقاناً تحصل على فرصة أكبر
+  const pickSkill = () => {
+    const ws = playable.map((x) => 1.2 - store.skillProgress(x.sk).value);
+    let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < ws.length; i++) if ((r -= ws[i]) <= 0) return playable[i];
+    return playable[0];
+  };
+
   runSession({
     title: "تحدّي اليوم",
     icon: "📅",
     total: 8,
-    next: () => GEN[randomOf(types)](ALL_LETTERS_LEVEL),
-    onExit: screenMap,
+    next: () => { const x = pickSkill(); const a = randomOf(x.acts); return GEN[a.type](a); },
+    onExit: screenHome,
     onFinish: (r) => {
       const stars = starsFor(r.mistakes, r.total);
       const prevStreak = store.currentStreak();
@@ -290,11 +348,10 @@ function startDaily() {
         if ([3, 7, 14, 30].includes(streak) && streak !== prevStreak) stickers.push(store.awardSticker());
       }
       showResult({
-        stars,
-        r,
+        stars, r,
         stickers: stickers.filter(Boolean),
         certs: checkCertificates(),
-        title: alreadyDone ? "تمرين إضافي رائع! 💪" : `أنجزت تحدّي اليوم! 🔥 ${streak}`,
+        title: alreadyDone ? "تمرين إضافي رائع! 💪" : `أنجزت تحدّي اليوم! 🔥 ${toArabicDigits(streak)}`,
         note: alreadyDone ? "" : `<p class="streak-note">${streak === 1 ? "🔥 بدأت سلسلتك اليوم! عد غداً لتكملها" : `🔥 ${plural(streak, ["يوم", "يومان", "أيام", "يوماً"])} متتالية، استمر!`}</p>`,
         primary: null,
         again: startDaily
@@ -312,14 +369,14 @@ function screenAlbum() {
       <b>🎁 ألبوم ${esc(p.name || "الملصقات")}</b>
       <span class="spacer"></span>
     </div>
-    <p class="sub">${p.stickers.length} من ${STICKERS.length} ملصقاً. اجمعها كلها بإنهاء المستويات وتحدّي اليوم!</p>
+    <p class="sub">${toArabicDigits(p.stickers.length)} من ${toArabicDigits(STICKERS.length)} ملصقاً. اجمعها كلها بإنهاء الأنشطة وتحدّي اليوم!</p>
     <div class="album">
       ${STICKERS.map((s) => p.stickers.includes(s.e)
         ? `<button class="sticker" data-n="${esc(s.n)}">${s.e}<small>${s.n}</small></button>`
         : `<div class="sticker locked">❔</div>`).join("")}
     </div>
   `);
-  $("#back").onclick = screenMap;
+  $("#back").onclick = screenHome;
   $$(".sticker[data-n]").forEach((b) => (b.onclick = () => {
     b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle");
     speak(b.dataset.n);
@@ -336,7 +393,7 @@ function screenCertificates() {
       <span class="spacer"></span>
     </div>
     <div class="cert-list">
-      ${CERTIFICATES.map((c) => {
+      ${CERTIFICATES.filter((c) => !c.skill || skillsFor().some((s) => s.id === c.skill)).map((c) => {
         const has = p.certificates.includes(c.id);
         return `<button class="cert-item ${has ? "" : "locked"}" data-id="${c.id}">
           <span class="ci">${has ? c.icon : "🔒"}</span>
@@ -345,7 +402,7 @@ function screenCertificates() {
       }).join("")}
     </div>
   `);
-  $("#back").onclick = screenMap;
+  $("#back").onclick = screenHome;
   $$(".cert-item").forEach((b) => (b.onclick = () => {
     const c = CERTIFICATES.find((x) => x.id === b.dataset.id);
     if (!p.certificates.includes(c.id)) { toast(c.how); return; }
@@ -361,4 +418,4 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
 // منع التكبير بالنقر المزدوج على أزرار اللعب
 document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
 
-store.active ? screenMap() : screenProfiles();
+store.active ? screenHome() : screenProfiles();

@@ -1,11 +1,11 @@
 // ============================================================
 //  لوحة الأهل: بوابة بسيطة + تقرير التقدّم ونقاط الضعف + الإعدادات
 // ============================================================
-import { LETTERS, HARAKAT } from "./data.js";
+import { LETTERS, HARAKAT, SKILLS } from "./data.js";
 import { store, MAX_BOX } from "./store.js";
 import { hasArabicVoice, sfx } from "./sfx.js";
 import { render, $, $$, esc, shuffle, today, toArabicDigits, toast, plural } from "./util.js";
-import { screenEditProfile, screenProfiles, visibleLevels } from "./main.js";
+import { screenEditProfile, screenProfiles, skillsFor, activitiesFor } from "./main.js";
 
 const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
 const hkName = Object.fromEntries(HARAKAT.map((h) => [h.id, h.name]));
@@ -78,8 +78,10 @@ const confText = (x) => byLetter[x.t]
 // ---------- التقرير ----------
 function screenReport(back) {
   const p = store.active;
-  const levels = visibleLevels(p);
+  const levels = activitiesFor(p).filter((a) => a.type !== "lesson");
   const done = levels.filter((l) => p.stars[l.id]).length;
+  const skills = skillsFor(p).map((sk) => ({ sk, pr: store.skillProgress(sk, p) }));
+  const weakest = skills.filter((x) => x.pr.seen).sort((a, b) => a.pr.value - b.pr.value)[0];
   const week = lastDays(p);
   const weekAnswers = week.reduce((s, d) => s + d.answers, 0);
   const weekRight = week.reduce((s, d) => s + d.right, 0);
@@ -94,6 +96,7 @@ function screenReport(back) {
   if (!weekAnswers && !Object.keys(p.mastery).length) advice = "لا توجد بيانات كافية بعد. بعد بضعة مستويات سيظهر هنا ما يتقنه طفلك وما يحتاج تمريناً.";
   else if (weak.length) advice = `ننصح بالتركيز على: ${weak.map((s) => `<b>${s.L.l}</b>`).join("، ")}. التطبيق يكرّر هذه الحروف تلقائياً أكثر من غيرها، و«تحدّي اليوم» يركّز عليها.`;
   else advice = "أداء ممتاز! جرّب المستويات التالية أو حافظ على تحدّي اليوم للمراجعة المنتظمة.";
+  if (weakest && weakest.pr.value < 0.6) advice += ` أضعف مهارة الآن: <b>${weakest.sk.icon} ${weakest.sk.name}</b>، جرّبا معاً أنشطة هذا القسم.`;
   if (weekAnswers && weekMin < 10) advice += " جلسات قصيرة يومية (5–10 دقائق) أفضل من جلسة طويلة أسبوعياً.";
 
   render(`
@@ -106,7 +109,7 @@ function screenReport(back) {
     <div class="parents">
       <div class="summary">
         <div><b>${n(store.totalStars(p))}</b><small>نجمة</small></div>
-        <div><b>${n(done)}/${n(levels.length)}</b><small>مستوى مكتمل</small></div>
+        <div><b>${n(done)}/${n(levels.length)}</b><small>نشاط مكتمل</small></div>
         <div><b>${n(mastered)}/${n(LETTERS.length)}</b><small>حرف متقن</small></div>
         <div><b>${n(weekMin)}</b><small>دقيقة هذا الأسبوع</small></div>
         <div><b>${weekAnswers ? n(Math.round(weekRight / weekAnswers * 100)) + "٪" : "—"}</b><small>دقة هذا الأسبوع</small></div>
@@ -114,6 +117,17 @@ function screenReport(back) {
       </div>
 
       <div class="panel advice">💡 ${advice}</div>
+
+      <h3>🎯 المهارات</h3>
+      <div class="panel skill-bars">
+        ${skills.map(({ sk, pr }) => `
+          <div class="sbar" style="--c:${sk.color}">
+            <span class="sname">${sk.icon} ${sk.name}</span>
+            <span class="meter"><i style="width:${Math.max(2, Math.round(pr.value * 100))}%"></i></span>
+            <b>${pr.seen ? n(Math.round(pr.value * 100)) + "٪" : "—"}</b>
+          </div>
+          <small class="sgoal">${sk.goal}</small>`).join("")}
+      </div>
 
       <h3>📅 آخر 7 أيام</h3>
       <div class="panel bars" role="img" aria-label="عدد الإجابات في آخر سبعة أيام">
@@ -143,10 +157,11 @@ function screenReport(back) {
           : `<p class="muted">لا يوجد خلط متكرر حتى الآن 👍</p>`}
       </div>
 
-      <h3>🗺️ المستويات</h3>
+      <h3>🗂️ الأنشطة</h3>
       <table>
-        <tr><th>المستوى</th><th>النجوم</th><th>مرات اللعب</th></tr>
-        ${levels.map((l) => `<tr><td>${l.icon} ${l.title}</td><td>${"⭐".repeat(p.stars[l.id] || 0) || "—"}</td><td>${n(p.plays[l.id] || 0)}</td></tr>`).join("")}
+        <tr><th>النشاط</th><th>النجوم</th><th>مرات اللعب</th></tr>
+        ${skills.map(({ sk }) => `<tr class="group-row"><th colspan="3">${sk.icon} ${sk.name}</th></tr>` +
+          sk.activities.filter((a) => a.type !== "lesson").map((l) => `<tr><td>${l.icon} ${l.title}</td><td>${"⭐".repeat(p.stars[l.id] || 0) || "—"}</td><td>${n(p.plays[l.id] || 0)}</td></tr>`).join("")).join("")}
       </table>
 
       <h3>⚙️ الإعدادات</h3>

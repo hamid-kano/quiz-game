@@ -3,11 +3,7 @@
 //  كل المحتوى هنا: لإضافة حرف أو كلمة أو مستوى عدّل هذا الملف فقط
 // ============================================================
 
-// LOCK_LEVELS = false: كل المستويات مفتوحة (أثناء التطوير والتجربة)
-// LOCK_LEVELS = true : يجب إنهاء كل مستوى لفتح الذي بعده
-export const LOCK_LEVELS = false;
-
-// عدد الأسئلة الافتراضي في كل مستوى (يمكن تغييره من لوحة الأهل)
+// عدد الأسئلة الافتراضي في كل نشاط (يمكن تغييره من لوحة الأهل)
 export const DEFAULT_ROUNDS = 6;
 
 // c: هل يتصل الحرف بما بعده؟
@@ -155,32 +151,90 @@ export const SENTENCES = [
   { s: "الصاروخ يطير إلى القمر", pic: "🚀🌙" }
 ];
 
-// age: small = 3–5 سنوات، big = 6–8 سنوات
-// المستويات تظهر بهذا الترتيب. للصغار: مستويات small فقط. للكبار: الكل.
-export const LEVELS = [
-  { id: "letters1", type: "letters", title: "حروف 1", desc: "من الألف إلى الخاء", range: [0, 7], icon: "🌱", age: "small" },
-  { id: "letters2", type: "letters", title: "حروف 2", desc: "من الدال إلى الضاد", range: [7, 15], icon: "🌿", age: "small" },
-  { id: "letters3", type: "letters", title: "حروف 3", desc: "من الطاء إلى الياء", range: [15, 28], icon: "🌳", age: "small" },
-  { id: "trace", type: "trace", title: "ارسم الحرف", desc: "تتبّع الحرف بإصبعك", icon: "✏️", age: "small" },
-  { id: "first", type: "first", title: "أول حرف", desc: "بأي حرف تبدأ الصورة؟", icon: "🖼️", age: "small" },
-  { id: "similar", type: "similar", title: "حروف متشابهة", desc: "انتبه للنقاط!", icon: "🔍", age: "small" },
-  { id: "numbers", type: "numbers", title: "الأرقام", desc: "عُدّ واختر الرقم", icon: "🔢", age: "small" },
-  { id: "memory", type: "memory", title: "لعبة الذاكرة", desc: "طابق الحرف مع صورته", icon: "🃏", age: "small" },
-  { id: "listen", type: "listen", title: "اسمع واختر", desc: "اسمع الكلمة واختر صورتها", icon: "👂", age: "small" },
-  { id: "opposites", type: "opposites", title: "الأضداد", desc: "كبير وصغير، حار وبارد", icon: "⚖️", age: "small" },
-  { id: "categories", type: "categories", title: "صنّف الأشياء", desc: "حيوان أم فاكهة أم مركبة؟", icon: "🧺", age: "small" },
-  { id: "harakat", type: "harakat", title: "الحركات", desc: "فتحة، ضمة، كسرة", icon: "🎵", age: "big" },
-  { id: "forms", type: "forms", title: "أشكال الحرف", desc: "اعرف الحرف من شكله", icon: "🔤", age: "big" },
-  { id: "position", type: "position", title: "مكان الحرف", desc: "أول الكلمة أم وسطها أم آخرها؟", icon: "📍", age: "big" },
-  { id: "build", type: "build", title: "ركّب الكلمة", desc: "كلمات من 2–3 حروف", words: "short", icon: "🧩", age: "big" },
-  { id: "read", type: "read", title: "اقرأ واختر", desc: "اقرأ الكلمة واختر صورتها", icon: "📖", age: "big" },
-  { id: "build2", type: "build", title: "كلمات أطول", desc: "كلمات من 4–5 حروف", words: "long", icon: "🏗️", age: "big" },
-  { id: "sentences", type: "sentences", title: "اقرأ الجملة", desc: "جمل قصيرة ومعناها", icon: "🏆", age: "big" },
-  { id: "hunt", type: "hunt", title: "صيد الحرف", desc: "اعثر على الكلمات التي فيها الحرف", icon: "🎯", age: "big" },
-  { id: "riddles", type: "riddles", title: "من أنا؟", desc: "اقرأ الأحجية واعرف الجواب", icon: "🕵️", age: "big" },
-  { id: "order", type: "order", title: "رتّب القصة", desc: "رتّب الجمل كما حدثت", icon: "🔢", age: "big" },
-  { id: "stories", type: "stories", title: "قصص قصيرة", desc: "اقرأ قصة وأجب عن الأسئلة", icon: "📚", age: "big" }
+// ============================================================
+//  الأقسام: كل قسم ينمّي مهارة واحدة، وفيه أنشطة تخدم هذه المهارة فقط
+//  age: all = للجميع، big = للكبار (6–8) فقط
+//  prefixes: مفاتيح الإتقان التي تُحسب ضمن هذه المهارة، target: عدد العناصر لاعتبارها متقنة 100٪
+// ============================================================
+export const SKILLS = [
+  {
+    id: "sounds", icon: "👂", name: "الأصوات", color: "#8e7dff",
+    goal: "يميّز الأصوات في الكلمات بالسمع، وهي الخطوة الأولى قبل القراءة",
+    prefixes: ["snd:", "lis:", "same:", "end:"], target: 40,
+    activities: [
+      { id: "listen", type: "listen", title: "اسمع واختر", desc: "اسمع الكلمة واختر صورتها", icon: "🎧", age: "all" },
+      { id: "sameSound", type: "sounds", title: "نفس الصوت", desc: "أي صورة تبدأ بنفس الصوت؟", icon: "🔔", age: "all" },
+      { id: "first", type: "first", title: "أول صوت", desc: "بأي حرف يبدأ صوت الكلمة؟", icon: "🖼️", age: "all" },
+      { id: "memory", type: "memory", mode: "pic", title: "ذاكرة الأصوات", desc: "طابق الحرف مع صورة تبدأ به", icon: "🃏", age: "all" },
+      { id: "lastSound", type: "first", mode: "last", title: "آخر صوت", desc: "بأي حرف تنتهي الكلمة؟", icon: "🔚", age: "big" }
+    ]
+  },
+  {
+    id: "letters", icon: "🔤", name: "الحروف", color: "#fb8500",
+    goal: "يتعرّف على أشكال الحروف وأسمائها ويميّز بين المتشابه منها",
+    prefixes: ["rec:", "dot:", "frm:"], target: 45,
+    activities: [
+      { id: "board", type: "lesson", title: "لوحة الحروف", desc: "تعرّف على كل حرف وصوته وأشكاله", icon: "📋", age: "all" },
+      { id: "letters1", type: "letters", title: "حروف 1", desc: "من الألف إلى الخاء", range: [0, 7], icon: "🌱", age: "all" },
+      { id: "letters2", type: "letters", title: "حروف 2", desc: "من الدال إلى الضاد", range: [7, 15], icon: "🌿", age: "all" },
+      { id: "letters3", type: "letters", title: "حروف 3", desc: "من الطاء إلى الياء", range: [15, 28], icon: "🌳", age: "all" },
+      { id: "similar", type: "similar", title: "حروف متشابهة", desc: "انتبه للنقاط!", icon: "🔍", age: "all" },
+      { id: "forms", type: "forms", title: "أشكال الحرف", desc: "الحرف في أول الكلمة ووسطها وآخرها", icon: "🔤", age: "big" },
+      { id: "memoryForms", type: "memory", mode: "form", title: "ذاكرة الأشكال", desc: "طابق الحرف مع شكله", icon: "🃏", age: "big" }
+    ]
+  },
+  {
+    id: "writing", icon: "✏️", name: "الكتابة", color: "#219ebc",
+    goal: "يتدرّب على رسم الحروف والأرقام بيده، ثم تهجئة الكلمات",
+    prefixes: ["trc:", "trcn:", "sp:", "miss:"], target: 40,
+    activities: [
+      { id: "trace", type: "trace", mode: "letters", title: "ارسم الحروف", desc: "تتبّع الحرف بإصبعك", icon: "✍️", age: "all" },
+      { id: "traceNum", type: "trace", mode: "numbers", title: "ارسم الأرقام", desc: "تتبّع الرقم بإصبعك", icon: "🔢", age: "all" },
+      { id: "build", type: "build", title: "ركّب الكلمة", desc: "كلمات من 2–3 حروف", words: "short", icon: "🧩", age: "big" },
+      { id: "build2", type: "build", title: "كلمات أطول", desc: "كلمات من 4–5 حروف", words: "long", icon: "🏗️", age: "big" }
+    ]
+  },
+  {
+    id: "reading", icon: "📖", name: "القراءة", color: "#2bb673",
+    goal: "يقرأ المقاطع بالحركات ثم الكلمات، ويجد الحروف داخلها",
+    prefixes: ["hk:", "madd:", "w:", "pos:", "starts:", "ends:", "hunt:"], target: 50,
+    activities: [
+      { id: "harakat", type: "harakat", title: "الحركات والمدود", desc: "بَ بُ بِ · با بو بي", icon: "🎵", age: "big" },
+      { id: "read", type: "read", title: "اقرأ واختر", desc: "اقرأ الكلمة واختر صورتها", icon: "📖", age: "big" },
+      { id: "position", type: "position", title: "مكان الحرف", desc: "أول الكلمة أم وسطها أم آخرها؟", icon: "📍", age: "big" },
+      { id: "hunt", type: "hunt", title: "صيد الحرف", desc: "اعثر على الكلمات التي فيها الحرف", icon: "🎯", age: "big" },
+      { id: "memoryWords", type: "memory", mode: "word", title: "ذاكرة الكلمات", desc: "طابق الكلمة مع صورتها", icon: "🃏", age: "big" }
+    ]
+  },
+  {
+    id: "understanding", icon: "🧠", name: "الفهم واللغة", color: "#ef476f",
+    goal: "يفهم المعاني ويصنّف الأشياء ويستنتج ويرتّب الأحداث",
+    prefixes: ["opp:", "cat:", "rid:", "s:", "ord:", "story:"], target: 40,
+    activities: [
+      { id: "opposites", type: "opposites", title: "الأضداد", desc: "كبير وصغير، حار وبارد", icon: "⚖️", age: "all" },
+      { id: "categories", type: "categories", title: "صنّف الأشياء", desc: "حيوان أم فاكهة أم مركبة؟", icon: "🧺", age: "all" },
+      { id: "riddles", type: "riddles", title: "من أنا؟", desc: "اقرأ الأحجية واعرف الجواب", icon: "🕵️", age: "big" },
+      { id: "sentences", type: "sentences", title: "اقرأ الجملة", desc: "جمل قصيرة ومعناها", icon: "💬", age: "big" },
+      { id: "order", type: "order", title: "رتّب القصة", desc: "رتّب الجمل كما حدثت", icon: "🔢", age: "big" },
+      { id: "stories", type: "stories", title: "قصص قصيرة", desc: "اقرأ قصة وأجب عن الأسئلة", icon: "📚", age: "big" }
+    ]
+  },
+  {
+    id: "numbers", icon: "🔢", name: "الأرقام", color: "#e0a100",
+    goal: "يعدّ ويتعرّف على الأرقام ويقارن ويجمع ويطرح",
+    prefixes: ["n:", "nn:", "cmp:", "add:", "sub:"], target: 25,
+    activities: [
+      { id: "numbers", type: "numbers", mode: "count", title: "العدّ", desc: "عُدّ واختر الرقم", icon: "🍎", age: "all" },
+      { id: "compare", type: "numbers", mode: "compare", title: "أكثر وأقل", desc: "أين المجموعة الأكبر؟", icon: "🐘", age: "all" },
+      { id: "memoryNum", type: "memory", mode: "num", title: "ذاكرة الأرقام", desc: "طابق الرقم مع عدده", icon: "🃏", age: "all" },
+      { id: "math", type: "numbers", mode: "math", title: "جمع وطرح", desc: "بالصور خطوة بخطوة", icon: "➕", age: "big" }
+    ]
+  }
 ];
+
+// كل الأنشطة في قائمة واحدة (مع اسم القسم)
+export const ACTIVITIES = SKILLS.flatMap((sk) => sk.activities.map((a) => ({ ...a, skill: sk.id })));
+export const LEVELS = ACTIVITIES; // للتوافق مع الكود القديم
 
 export const AVATARS = ["🦁", "🐼", "🐰", "🦊", "🐯", "🐨", "🐸", "🦄", "🐧", "🐵", "🐱", "🐶"];
 

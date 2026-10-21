@@ -1,39 +1,28 @@
 // ============================================================
 //  الشهادات: تُرسم محلياً على Canvas وتُحمَّل أو تُطبع بدون أي خدمة خارجية
 // ============================================================
-import { LEVELS, LETTERS } from "./data.js";
+import { SKILLS } from "./data.js";
 import { store } from "./store.js";
 import { render, $, esc, today, toArabicDigits, toast } from "./util.js";
 import { sfx } from "./sfx.js";
 
-const levelsFor = (age) => LEVELS.filter((l) => l.age === age);
-const allStarred = (p, list) => list.every((l) => (p.stars[l.id] || 0) > 0);
+// شهادة لكل مهارة عند بلوغ 80٪ من إتقانها، وشهادة للمواظبة
+const SKILL_CERT_TEXT = {
+  sounds: "لتميّزه في سماع الأصوات وتمييزها في الكلمات",
+  letters: "لإتقانه التعرّف على حروف اللغة العربية وأشكالها",
+  writing: "لتميّزه في كتابة الحروف والأرقام وتهجئة الكلمات",
+  reading: "لتميّزه في قراءة المقاطع والكلمات",
+  understanding: "لتميّزه في فهم المعاني والجمل والقصص",
+  numbers: "لتميّزه في العدّ والمقارنة والحساب"
+};
 
 export const CERTIFICATES = [
-  {
-    id: "small-path", icon: "🐣", title: "مرحلة الأساسيات",
-    text: "لإنهائه جميع مستويات مرحلة الأساسيات في تعلّم الحروف",
-    how: "أنهِ كل مستويات الأساسيات بنجمة واحدة على الأقل",
-    check: (p) => allStarred(p, levelsFor("small"))
-  },
-  {
-    id: "letters-master", icon: "🔤", title: "إتقان الحروف",
-    text: "لإتقانه التعرّف على حروف اللغة العربية الثمانية والعشرين",
-    how: "تعرّف على كل الحروف صحيحاً عدة مرات متتالية",
-    check: (p) => LETTERS.every((L) => (p.mastery["rec:" + L.l]?.box || 0) >= 3)
-  },
-  {
-    id: "big-path", icon: "🦁", title: "القارئ الصغير",
-    text: "لإنهائه جميع مستويات الكلمات والجمل والحركات",
-    how: "أنهِ كل مستويات الكبار بنجمة واحدة على الأقل",
-    check: (p) => p.age === "big" && allStarred(p, levelsFor("big"))
-  },
-  {
-    id: "all-stars", icon: "🌟", title: "نجم حروفي",
-    text: "لحصوله على ثلاث نجوم في كل مستويات التطبيق",
-    how: "احصل على 3 نجوم في كل المستويات المتاحة لك",
-    check: (p) => (p.age === "small" ? levelsFor("small") : LEVELS).every((l) => p.stars[l.id] === 3)
-  },
+  ...SKILLS.map((sk) => ({
+    id: "skill-" + sk.id, skill: sk.id, icon: sk.icon, title: `بطل ${sk.name}`,
+    text: SKILL_CERT_TEXT[sk.id],
+    how: `اوصل إلى ٨٠٪ من إتقان مهارة ${sk.name}`,
+    check: (p) => store.skillProgress(sk, p).value >= 0.8
+  })),
   {
     id: "streak-7", icon: "🔥", title: "بطل الأسبوع",
     text: "لمواظبته على التعلّم سبعة أيام متتالية",

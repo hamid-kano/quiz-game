@@ -3,7 +3,7 @@
 // ============================================================
 import { LETTERS } from "./data.js";
 import { store } from "./store.js";
-import { speak, stopSpeech, sfx } from "./sfx.js";
+import { speak, stopSpeech, sfx, canHear } from "./sfx.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
 
@@ -85,13 +85,19 @@ function header(s) {
     <div class="progress-dots" aria-label="السؤال ${s.round + 1} من ${s.total}">${dots}</div>`;
 }
 
-function bindCommon(s, sayText) {
+function bindCommon(s, sayText, slow = false) {
   $("#back").onclick = s.exit;
   const btn = $("#say");
   if (btn && sayText) {
-    btn.onclick = () => speak(sayText);
-    setTimeout(() => speak(sayText), 250);
+    btn.onclick = () => speak(sayText, { slow });
+    setTimeout(() => speak(sayText, { slow }), 250);
   }
+}
+
+// بدون صوت عربي في الجهاز: نعرض للأهل ما يجب قراءته للطفل بصوت عالٍ
+function parentNote(text) {
+  if (!text || canHear() || store.active.age !== "small") return "";
+  return `<div class="parent-note">👪 لا يوجد صوت في الجهاز، اقرأ لطفلك: <b>«${esc(text)}»</b></div>`;
 }
 
 // ---------- سؤال اختيار ----------
@@ -101,12 +107,13 @@ function choiceRound(s, q) {
     ${header(s)}
     <div class="prompt">${q.promptHtml}
       ${q.say ? `<div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>` : ""}
+      ${parentNote(q.say)}
     </div>
     <div class="choices ${cols}">
       ${q.options.map((o, i) => `<button class="choice ${o.emoji ? "emoji" : ""} ${o.text ? "text" : ""} ${o.num ? "num" : ""} ${o.word ? "word" : ""} ${o.sentence ? "sentence-opt" : ""}" data-i="${i}">${o.html}</button>`).join("")}
     </div>
   `);
-  bindCommon(s, q.say);
+  bindCommon(s, q.say, q.slow);
   let wrongCount = 0;
   $$(".choice").forEach((btn) => (btn.onclick = () => {
     const o = q.options[Number(btn.dataset.i)];
@@ -118,6 +125,8 @@ function choiceRound(s, q) {
     } else {
       btn.classList.add("wrong");
       btn.disabled = true;
+      // عند اختيار صورة خاطئة ننطق اسمها ليسمع الطفل الفرق
+      if (q.sayOption && o.emoji) speak(o.id);
       s.wrong(q.target, o.id);
       wrongCount++;
       // بعد خطأين نلمّح للإجابة بلطف حتى لا يُحبط الطفل
