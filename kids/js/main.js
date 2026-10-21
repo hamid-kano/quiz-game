@@ -13,6 +13,7 @@ import { screenStories } from "./stories.js";
 import { screenGarden } from "./garden.js";
 import { screenSpellGuide } from "./spellguide.js";
 import { runArcade } from "./arcade.js";
+import { screenVocab } from "./vocab.js";
 
 // ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
 const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
@@ -210,6 +211,7 @@ export function startActivity(act) {
   if (act.type === "lesson") return screenBoard(act);
   if (act.type === "spellGuide") return screenSpellGuide(back, startActivity);
   if (act.type === "arcade") return runArcade(act, { onExit: back, onFinish: (r) => finishActivity(act, r) });
+  if (act.type === "vocab") return screenVocab(act, back, (r, again) => finishActivity(act, r, again));
   const total =
     act.type === "trace" ? Math.min(4, store.settings.rounds)
     : act.type === "memory" ? 4
@@ -237,7 +239,7 @@ function rewardsFor(id, stars) {
   return stickers.filter(Boolean);
 }
 
-function finishActivity(act, r) {
+function finishActivity(act, r, againFn = null) {
   const stars = starsFor(r.mistakes, r.total);
   const stickers = rewardsFor(act.id, stars);
   const sk = skillsFor().find((s) => s.id === act.skill);
@@ -250,7 +252,7 @@ function finishActivity(act, r) {
     title: stars === 3 ? "ممتاز! أنت بطل 🏆" : stars === 2 ? "أحسنت! 👏" : "جيد! جرّب مرة أخرى لتحصل على نجوم أكثر",
     note: `<div class="skill-note" style="--c:${sk.color}">${sk.icon} مهارة ${sk.name}: ${toArabicDigits(pct(pr.value))}٪ <span class="meter"><i style="width:${Math.max(3, pct(pr.value))}%"></i></span></div>`,
     primary: next && next.id !== act.id ? { label: `${next.icon} ${next.title}`, run: () => startActivity(next) } : null,
-    again: () => startActivity(act),
+    again: againFn || (() => startActivity(act)),
     home: { label: `${sk.icon} قسم ${sk.name}`, run: () => screenSkill(sk.id) }
   });
 }

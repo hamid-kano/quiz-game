@@ -6,7 +6,7 @@
 import {
   LETTERS, SIMILAR_GROUPS, WORDS_SHORT, WORDS_LONG, ALL_WORDS, LETTER_WORDS, HARAKAT,
   NUMBERS, COUNT_EMOJIS, SENTENCES, STORIES, OPPOSITES, CATEGORIES, RIDDLES,
-  SPELL_WORDS, CLOSED_SYLLABLES, TANWEEN, SHAMS_LETTERS
+  SPELL_WORDS, CLOSED_SYLLABLES, TANWEEN, SHAMS_LETTERS, VOCAB
 } from "./data.js";
 import { store } from "./store.js";
 import { shuffle, pick, randomOf, esc, letterForms, toArabicDigits } from "./util.js";
@@ -776,6 +776,44 @@ export const GEN = {
           done: `${w.w} تبدأ بحرف ${L.name}`, rec: "snd:" + L.l
         };
       })
+    };
+  },
+
+  // ---------------- المفردات حسب الموضوع ----------------
+  vocab(level) {
+    const theme = VOCAB.find((t) => t.id === level.theme) || randomOf(VOCAB);
+    const [target] = store.pickWeighted(theme.words, (w) => "voc:" + w.w);
+    const v = variant({ hear: [3, 2], toWord: [0, 2], odd: [2, 1] });
+    const others = shuffle(theme.words.filter((w) => w !== target)).slice(0, optionCount() - 1);
+    if (v === "odd") {
+      const otherTheme = randomOf(VOCAB.filter((t) => t !== theme));
+      const odd = randomOf(otherTheme.words.filter((w) => !theme.words.some((x) => x.emoji === w.emoji)));
+      const same = shuffle(theme.words).slice(0, optionCount() - 1);
+      return {
+        kind: "choice", key: "voc:" + odd.w, target: null,
+        promptHtml: `<div class="q">أيّ واحد ليس من <b>${theme.name}</b>؟</div><div class="pic small-pic">${theme.icon}</div>`,
+        say: `أي واحد ليس من ${theme.name}؟`,
+        options: shuffle([...same.map((w) => picOpt(w, false)), picOpt(odd, true)]),
+        sayOption: true,
+        praise: `صحيح، ${odd.w} ليس من ${theme.name}`
+      };
+    }
+    if (v === "toWord") {
+      return {
+        kind: "choice", key: "voc:" + target.w, target: target.w,
+        promptHtml: `<div class="q">ما اسم هذه الصورة؟</div><div class="pic">${target.emoji}</div>`,
+        say: null,
+        options: shuffle([target, ...others]).map((w) => ({ id: w.w, html: w.w, right: w === target, word: true })),
+        praise: target.w
+      };
+    }
+    return {
+      kind: "choice", key: "voc:" + target.w, target: target.w,
+      promptHtml: `<div class="q">اسمع واختر الصورة</div><div class="ear">👂</div>`,
+      say: `${target.w}... ${target.w}`, slow: !big(),
+      options: shuffle([target, ...others]).map((w) => picOpt(w, w === target)),
+      sayOption: true,
+      praise: target.w
     };
   },
 

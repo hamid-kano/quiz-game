@@ -688,3 +688,16 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .coin.c5 { background: radial-gradient(circle at 35% 30%, #e3f2fd, #90caf9 60%, #42a5f5); box-shadow: 0 3px 0 #1565c0, inset 0 0 0 3px #64b5f6; color: #0d47a1; }
 .paybtn { background: var(--good); color: #fff; border-radius: 999px; padding: 10px 34px; font-weight: 900; font-size: 22px; box-shadow: 0 6px 0 #1d8a55; cursor: pointer; }
 .paybtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1d8a55; }
+
+/* مفرداتي */
+.themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.theme { border: 0; background: #fff; border-radius: 20px; padding: 12px 8px; cursor: pointer; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 4px; box-shadow: 0 5px 0 var(--shadow); --c: var(--good); }
+.theme .ticon { font-size: 42px; line-height: 1.2; }
+.theme b { font-size: 16px; }
+.theme small { color: var(--muted); font-size: 12px; }
+.vcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
+.vcard { border: 0; background: #fff; border-radius: 18px; padding: 8px 4px; cursor: pointer; color: var(--ink); display: flex; flex-direction: column; align-items: center; box-shadow: 0 4px 0 var(--shadow); }
+.vcard span { font-size: 44px; line-height: 1.2; }
+.vcard b { font-family: var(--letter-font); font-size: 22px; line-height: 1.5; }
+.vcard.lit { background: #e5f8ee; box-shadow: 0 4px 0 #1d8a55; animation: jump .4s; }
+@media (min-width: 560px) { .themes { grid-template-columns: repeat(3, 1fr); } .vcards { grid-template-columns: repeat(4, 1fr); } }

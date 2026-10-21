@@ -180,7 +180,7 @@ function memoryRound(s, q) {
     <div class="prompt compact"><div class="q" id="mtitle">${q.preview ? "👀 احفظ أماكن البطاقات!" : `اقلب بطاقتين: ${q.title}`}</div></div>
     <div class="memory ${cols} ${cards.length > 8 ? "many" : ""}">
       ${cards.map((c, i) => `
-        <button class="mcard" data-i="${i}" aria-label="بطاقة">
+        <button class="mcard" data-i="${i}" data-p="${c.idx}" aria-label="بطاقة">
           <span class="mback">❓</span>
           <span class="mface ${c.cls}">${c.face}</span>
         </button>`).join("")}
@@ -401,7 +401,7 @@ function buildRound(s, q) {
 }
 
 // ---------- لوحة المفاتيح: اكتب الكلمة كاملة بالضغط على الحروف ----------
-const KEYS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي", "ة", "أ", "ى", "ء", "ئ", "ؤ"];
+const KEYS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي", "ة", "أ", "إ", "آ", "ى", "ء", "ئ", "ؤ"];
 function keyboardRound(s, q) {
   const target = q.word;
   const letters = [...target.w];
