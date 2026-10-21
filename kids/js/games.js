@@ -3,7 +3,7 @@
 // ============================================================
 import { LETTERS } from "./data.js";
 import { store } from "./store.js";
-import { speak, stopSpeech, sfx, canHear } from "./sfx.js";
+import { speak, stopSpeech, speechDone, sfx, canHear } from "./sfx.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
 
@@ -23,14 +23,22 @@ let tickTimer = null;
  *  onExit()
  */
 export function runSession(opt) {
-  const s = { ...opt, round: 0, results: [], mistakes: 0, missed: false, seen: new Set() };
+  // qid: رقم السؤال الحالي، answered: هل أجاب الطفل عليه
+  // نستخدمهما حتى لا يُنطق سؤال قديم بعد الإجابة أو بعد الانتقال
+  const s = { ...opt, round: 0, results: [], mistakes: 0, missed: false, seen: new Set(), qid: 0, answered: false, ended: false };
 
   clearInterval(tickTimer);
   tickTimer = setInterval(() => { if (!document.hidden) store.addSeconds(5); }, 5000);
 
-  const stop = () => { clearInterval(tickTimer); stopSpeech(); };
+  const stop = () => { s.ended = true; clearInterval(tickTimer); stopSpeech(); };
 
   s.exit = () => { stop(); opt.onExit(); };
+
+  // ينطق نصاً فقط إذا كان السؤال نفسه ما زال معروضاً ولم يُجب عليه
+  s.sayIfCurrent = (text, opts, delay = 0) => {
+    const id = s.qid;
+    setTimeout(() => { if (!s.ended && id === s.qid && !s.answered) speak(text, opts); }, delay);
+  };
 
   s.wrong = (target, chosen) => {
     sfx.wrong();
@@ -38,19 +46,31 @@ export function runSession(opt) {
     store.confuse(target, chosen);
   };
 
+  // بعد الإجابة الصحيحة: ننتظر انتهاء عبارة المديح (وحداً أدنى من الوقت) ثم ننتقل
   s.right = (q, delay = 900) => {
+    if (s.answered) return;
+    s.answered = true;
     sfx.right();
     store.record(q.key, !s.missed);
     s.results.push(!s.missed);
     s.round++;
     s.missed = false;
-    setTimeout(() => {
+    const id = s.qid;
+    const minWait = new Promise((r) => setTimeout(r, delay));
+    // speechDone يُقرأ بعد لحظة لأن المديح قد يبدأ بعد استدعاء right مباشرة
+    const praise = new Promise((r) => setTimeout(r, 80)).then(() => speechDone());
+    const maxWait = new Promise((r) => setTimeout(r, 7000));
+    Promise.race([Promise.all([minWait, praise]), maxWait]).then(() => {
+      if (s.ended || id !== s.qid) return;
       if (s.round >= s.total) { stop(); opt.onFinish({ firstTry: s.results.filter(Boolean).length, total: s.total, mistakes: s.mistakes }); }
-      else show();
-    }, delay);
+      else setTimeout(show, 250);
+    });
   };
 
   function show() {
+    s.qid++;
+    s.answered = false;
+    stopSpeech();
     // تجنّب تكرار نفس السؤال في الجلسة قدر الإمكان
     let q;
     for (let tries = 0; tries < 6; tries++) {
@@ -89,8 +109,8 @@ function bindCommon(s, sayText, slow = false) {
   $("#back").onclick = s.exit;
   const btn = $("#say");
   if (btn && sayText) {
-    btn.onclick = () => speak(sayText, { slow });
-    setTimeout(() => speak(sayText, { slow }), 250);
+    btn.onclick = () => { if (!s.answered) speak(sayText, { slow }); };
+    s.sayIfCurrent(sayText, { slow }, 300);
   }
 }
 
