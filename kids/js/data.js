@@ -557,3 +557,28 @@ SKILLS.splice(2, 0, {
   ACTIVITIES.length = 0;
   ACTIVITIES.push(...SKILLS.flatMap((sk) => sk.activities.map((a) => ({ ...a, skill: sk.id }))));
 }
+
+// ============================================================
+//  ألعاب الأقسام: لعبة لكل مهارة (تُعرض أولاً في القسم)
+// ============================================================
+{
+  const GAMES_BY_SKILL = {
+    sounds: { id: "gBubbles", mode: "bubbles", title: "فقاعات الأصوات", desc: "فقّع الصور التي تبدأ بالصوت", icon: "🫧", age: "all" },
+    letters: { id: "gMole", mode: "mole", title: "اضرب الخُلد", desc: "اضرب الخُلد الذي يحمل الحرف", icon: "🔨", age: "all" },
+    spelling: { id: "gTrain", mode: "train", title: "قطار المقاطع", desc: "اربط العربات لتكوّن الكلمة", icon: "🚂", age: "all" },
+    writing: { id: "gMaze", mode: "maze", title: "طريق الحرف", desc: "قُد السيارة على طريق الحرف", icon: "🚗", age: "all" },
+    reading: { id: "gRace", mode: "race", title: "سباق الكلمات", desc: "اضغط السيارة التي تحمل الكلمة", icon: "🏁", age: "big" },
+    understanding: { id: "gBaskets", mode: "baskets", title: "سلال التصنيف", desc: "اسحب كل شيء إلى سلّته", icon: "🧺", age: "all" },
+    numbers: { id: "gShop", mode: "shop", title: "دكّان حروفي", desc: "اشترِ وادفع الثمن بالقطع النقدية", icon: "🏪", age: "all" }
+  };
+  for (const sk of SKILLS) {
+    const g = GAMES_BY_SKILL[sk.id];
+    if (!g) continue;
+    // اللعبة بعد الدليل/اللوحة إن وُجدا، وإلا في البداية
+    const at = sk.activities.findIndex((a) => a.type !== "lesson" && a.type !== "spellGuide");
+    sk.activities.splice(Math.max(0, at), 0, { ...g, type: "arcade", game: true });
+  }
+  SKILLS.find((s) => s.id === "numbers").prefixes.push("shop:");
+  ACTIVITIES.length = 0;
+  ACTIVITIES.push(...SKILLS.flatMap((sk) => sk.activities.map((a) => ({ ...a, skill: sk.id }))));
+}

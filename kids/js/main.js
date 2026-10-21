@@ -12,6 +12,7 @@ import { CERTIFICATES, checkCertificates, screenCertificate } from "./rewards.js
 import { screenStories } from "./stories.js";
 import { screenGarden } from "./garden.js";
 import { screenSpellGuide } from "./spellguide.js";
+import { runArcade } from "./arcade.js";
 
 // ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
 const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
@@ -187,9 +188,9 @@ export function screenSkill(skillId) {
     <div class="activities">
       ${sk.activities.map((a) => {
         const s = p.stars[a.id] || 0;
-        return `<button class="activity" data-id="${a.id}" style="--c:${sk.color}">
+        return `<button class="activity ${a.game ? "is-game" : ""}" data-id="${a.id}" style="--c:${sk.color}">
           <span class="num">${a.icon}</span>
-          <span class="info"><b>${a.step ? `<span class="stepno">${toArabicDigits(a.step)}</span>` : ""}${a.title}</b><small>${a.desc}</small></span>
+          <span class="info"><b>${a.step ? `<span class="stepno">${toArabicDigits(a.step)}</span>` : ""}${a.title}${a.game ? ` <span class="gbadge">🎮 لعبة</span>` : ""}</b><small>${a.desc}</small></span>
           <span class="lstars">${a.type === "lesson" || a.type === "spellGuide" ? "📖" : starsText(s)}</span>
         </button>`;
       }).join("")}
@@ -208,6 +209,7 @@ export function startActivity(act) {
   if (act.type === "stories") return screenStories(back, (st, r) => finishStory(st, r, act));
   if (act.type === "lesson") return screenBoard(act);
   if (act.type === "spellGuide") return screenSpellGuide(back, startActivity);
+  if (act.type === "arcade") return runArcade(act, { onExit: back, onFinish: (r) => finishActivity(act, r) });
   const total =
     act.type === "trace" ? Math.min(4, store.settings.rounds)
     : act.type === "memory" ? 4
@@ -324,7 +326,7 @@ function startDaily() {
   const alreadyDone = store.dailyDoneToday();
   const playable = skillsFor().map((sk) => ({
     sk,
-    acts: sk.activities.filter((a) => !["lesson", "spellGuide", "stories", "trace", "memory", "order"].includes(a.type))
+    acts: sk.activities.filter((a) => !["lesson", "spellGuide", "stories", "trace", "memory", "order", "arcade"].includes(a.type))
   })).filter((x) => x.acts.length);
 
   // المهارة الأقل إتقاناً تحصل على فرصة أكبر
