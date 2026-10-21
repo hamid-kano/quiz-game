@@ -7,21 +7,48 @@ import asyncio, sys, os, re, contextlib, threading, http.server, socketserver, f
 from playwright.async_api import async_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = int(os.environ.get("HUROOFI_PORT", "8765"))
-BASE = f"http://localhost:{PORT}/kids/"
+def _pick_port():
+    """منفذ الخادم: من متغير البيئة، أو أول منفذ يعمل عليه خادم حروفي، أو أول منفذ فارغ."""
+    if os.environ.get("HUROOFI_PORT"):
+        return int(os.environ["HUROOFI_PORT"])
+    import socket, urllib.request
+    for p in range(8765, 8800):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{p}/kids/js/data.js", timeout=1)
+            return p
+        except Exception:
+            pass
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", p))
+            return p
+        except OSError:
+            continue
+        finally:
+            s.close()
+    return 8765
+
+PORT = _pick_port()
+os.environ["HUROOFI_PORT"] = str(PORT)
+BASE = f"http://127.0.0.1:{PORT}/kids/"
 
 def start_server():
     """يشغّل خادماً محلياً للمستودع إن لم يكن يعمل."""
     import urllib.request
     try:
-        urllib.request.urlopen(BASE, timeout=1)
+        urllib.request.urlopen(BASE, timeout=5)
         return None
     except Exception:
         pass
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT)
     class Quiet(handler.func):
         def log_message(self, *a): pass
-    httpd = socketserver.ThreadingTCPServer(("127.0.0.1", PORT), functools.partial(Quiet, directory=ROOT))
+    class Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True  # يسمح بإعادة استخدام المنفذ مباشرة بعد إغلاق خادم سابق
+    try:
+        httpd = Server(("127.0.0.1", PORT), functools.partial(Quiet, directory=ROOT))
+    except OSError:
+        return None  # خادم آخر يعمل على المنفذ نفسه
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
