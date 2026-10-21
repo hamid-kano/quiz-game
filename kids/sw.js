@@ -1,6 +1,6 @@
 // عامل الخدمة: يحفظ كل ملفات التطبيق ليعمل بدون إنترنت
 // غيّر رقم الإصدار عند إضافة ملفات جديدة
-const CACHE = "huroofi-v18";
+const CACHE = "huroofi-v19";
 const FILES = [
   "./", "index.html", "manifest.json", "icon.svg",
   "css/style.css",

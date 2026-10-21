@@ -701,3 +701,85 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .vcard b { font-family: var(--letter-font); font-size: 22px; line-height: 1.5; }
 .vcard.lit { background: #e5f8ee; box-shadow: 0 4px 0 #1d8a55; animation: jump .4s; }
 @media (min-width: 560px) { .themes { grid-template-columns: repeat(3, 1fr); } .vcards { grid-template-columns: repeat(4, 1fr); } }
+
+/* ============================================================
+   التجاوب مع الشاشات الضيقة وحجم الخط المكبّر في أندرويد
+   - أعمدة الشبكات تتقلص (minmax(0, 1fr)) بدل أن تفرض عرض محتواها
+   - الخطوط الكبيرة تتناسب مع عرض الشاشة (clamp)
+   - النصوص الطويلة تلتف بدل أن تخرج عن الشاشة
+   ============================================================ */
+html, body { max-width: 100%; }
+.app { width: 100%; }
+.profiles, .age-cards, .choices, .choices.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.choices.three, .vcards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.choices.one { grid-template-columns: minmax(0, 1fr); }
+.skills, .themes, .library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.quick, .album, .board, .garden { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.memory { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.memory.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.memory.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.letter-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.keyboard { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.avatars { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+.grid-fix > *, .profiles > *, .age-cards > *, .choices > *, .skills > *, .quick > *, .album > *, .board > *,
+.garden > *, .memory > *, .summary > *, .letter-grid > *, .keyboard > *, .avatars > *, .themes > *,
+.vcards > *, .library > *, .tiles > *, .activities > *, .level, .activity, .topbar > * { min-width: 0; }
+
+/* نصوص طويلة داخل الأزرار والبطاقات تلتف ولا تخرج */
+.choice, .choice.text, .choice.word, .choice.sentence-opt, .quick-btn span, .quick-btn small, .profile-card b,
+.age-card b, .age-card span, .skill-card b, .activity .info b, .activity .info small, .theme b, .vcard b,
+.summary small, .stars-pill, .chip-btn, .btn, .rule, .q, .sub { overflow-wrap: anywhere; }
+
+/* أحجام تتناسب مع عرض الشاشة */
+.av { font-size: clamp(20px, 7.4vw, 30px); }
+.bl { font-size: clamp(24px, 9vw, 40px); }
+.lg { font-size: clamp(16px, 5.6vw, 26px); }
+.key { font-size: clamp(15px, 5.2vw, 24px); }
+.choice { font-size: clamp(38px, 13vw, 58px); }
+.choice.emoji { font-size: clamp(36px, 12vw, 54px); }
+.choice.text { font-size: clamp(14px, 4.6vw, 18px); }
+.choice.word { font-size: clamp(20px, 7.5vw, 34px); }
+.choice.sentence-opt { font-size: clamp(18px, 6vw, 26px); }
+.choice.num { font-size: clamp(30px, 11vw, 50px); }
+.quick-btn { font-size: clamp(20px, 7vw, 26px); padding-inline: 2px; }
+.quick-btn span { font-size: clamp(12px, 3.8vw, 15px); }
+.sk-icon { font-size: clamp(32px, 11vw, 44px); }
+.mascot { font-size: clamp(64px, 22vw, 92px); }
+h1 { font-size: clamp(26px, 9vw, 36px); }
+.prompt .big { font-size: clamp(56px, 20vw, 88px); }
+.prompt .pic { font-size: clamp(60px, 21vw, 88px); }
+.learn-card .big { font-size: clamp(90px, 32vw, 130px); }
+.age-card .e { font-size: clamp(36px, 12vw, 48px); }
+.profile-card .avatar { font-size: clamp(42px, 14vw, 58px); }
+.ex { font-size: clamp(24px, 8vw, 34px); }
+.vcard span { font-size: clamp(32px, 11vw, 44px); }
+.vcard b { font-size: clamp(16px, 5.2vw, 22px); }
+
+/* أزرار التنقل تلتف عند ضيق المساحة */
+.learn-nav { flex-wrap: wrap; }
+.learn-nav .btn { flex: 1 1 auto; min-width: 0; padding-inline: 14px; }
+.result-actions .btn, .btn.block { white-space: normal; }
+
+/* تقرير الأهل: شريط المهارة يتكيّف */
+.skill-bars .sbar { grid-template-columns: minmax(0, 42%) minmax(0, 1fr) auto; }
+.skill-bars .sname { overflow-wrap: anywhere; }
+.parents table { table-layout: fixed; }
+.parents td, .parents th { overflow-wrap: anywhere; }
+
+/* شاشات ضيقة جداً */
+@media (max-width: 380px) {
+  .avatars { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .letter-grid { gap: 4px; }
+  .keyboard { gap: 4px; }
+  .app { padding-inline: 12px; }
+}
+@media (min-width: 560px) {
+  .skills { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .themes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vcards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .board { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .album { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
