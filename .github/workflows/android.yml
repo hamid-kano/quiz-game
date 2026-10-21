@@ -1,0 +1,66 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ["kids/**", "android/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # رقم إصدار يزيد مع كل بناء 
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+      HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and copy web files into the app
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: Build test APK (debug)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk "../huroofi-${VERSION_NAME}-test.apk"
+
+      # نسخة المتجر: تُبنى فقط إذا أُضيف مفتاح التوقيع في أسرار المستودع
+      - name: Build signed store bundle (AAB)
+        if: env.HAS_SIGNING_KEY == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          ./gradlew --no-daemon bundleRelease assembleRelease
+          mv app/build/outputs/bundle/release/app-release.aab "../huroofi-${VERSION_NAME}-store.aab"
+          mv app/build/outputs/apk/release/app-release.apk "../huroofi-${VERSION_NAME}-release.apk"
+          rm -f "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: huroofi-android-${{ env.VERSION_NAME }}
+          path: |
+            huroofi-*.apk
+            huroofi-*.aab
+          retention-days: 90

@@ -14,6 +14,7 @@ import { screenGarden } from "./garden.js";
 import { screenSpellGuide } from "./spellguide.js";
 import { runArcade } from "./arcade.js";
 import { screenVocab } from "./vocab.js";
+import { isNative, setupBackButton } from "./native.js";
 
 // ---------- الأقسام والأنشطة المتاحة حسب العمر ----------
 const fitsAge = (a, p = store.active) => a.age === "all" || p.age === "big";
@@ -418,7 +419,9 @@ function screenCertificates() {
 }
 
 // ---------- البدء ----------
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+// في التطبيق الأصلي كل الملفات داخل التطبيق، فلا حاجة لعامل الخدمة
+if (isNative) setupBackButton();
+else if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 

@@ -1,5 +1,6 @@
 // الصوت والمؤثرات: كلها تعمل محلياً داخل المتصفح بدون أي خدمة خارجية
 import { store } from "./store.js";
+import { isNative, TTS, checkNativeArabic, nativeArabicReady } from "./native.js";
 
 let arVoice = null;
 function pickVoice() {
@@ -25,9 +26,12 @@ const markSpeaks = () => {
   try { localStorage.setItem("huroofi-tts-ok", "1"); } catch {}
 };
 
-export const hasArabicVoice = () => !!arVoice || deviceSpeaks;
+// داخل تطبيق أندرويد: النطق بمحرّك الجوال نفسه
+if (isNative) checkNativeArabic();
 
-export const canHear = () => store.settings.speech && (!!arVoice || deviceSpeaks);
+export const hasArabicVoice = () => (isNative ? nativeArabicReady() : !!arVoice || deviceSpeaks);
+
+export const canHear = () => store.settings.speech && hasArabicVoice();
 
 // عبارة المديح تبدأ دائماً بكلمة تشجيع، حتى لا يظن الطفل أن السؤال يتكرر
 export const praiseText = (t) => (!t ? "" : /^(أحسنت|ممتاز|رائع|صحيح|جيد|برافو)/.test(t) ? t : `أحسنت! ${t}`);
@@ -46,6 +50,7 @@ const estimateMs = (text, rate) => 700 + (text.length * 110) / rate;
 // slow = نطق أبطأ (للتمارين الصوتية عند الصغار)
 export function speak(text, { slow = false } = {}) {
   const id = ++speechId;
+  if (isNative && TTS) return speakNative(text, slow, id);
   if (!text || !store.settings.speech || !("speechSynthesis" in window)) {
     current = Promise.resolve();
     return current;
@@ -90,12 +95,31 @@ export function speak(text, { slow = false } = {}) {
   return current;
 }
 
+// النطق في التطبيق: الوعد ينتهي عندما ينتهي الجوال من النطق فعلاً
+function speakNative(text, slow, id) {
+  if (!text || !store.settings.speech) {
+    current = Promise.resolve();
+    return current;
+  }
+  const maxMs = Math.min(14000, estimateMs(text, slow ? 0.55 : 0.8) * 1.8 + 1500);
+  const run = (async () => {
+    try { await TTS.stop(); } catch {}
+    if (id !== speechId) return;
+    try {
+      await TTS.speak({ text, lang: "ar-SA", rate: slow ? 0.6 : 0.85, pitch: 1.1, volume: 1, category: "playback", queueStrategy: 0 });
+    } catch { /* لا يوجد صوت عربي أو أُلغي النطق */ }
+  })();
+  current = Promise.race([run, new Promise((r) => setTimeout(r, maxMs))]);
+  return current;
+}
+
 // ينتهي عند انتهاء النطق الحالي (أو فوراً إن لم يكن هناك نطق)
 export const speechDone = () => current;
 
 export function stopSpeech() {
   speechId++;
   current = Promise.resolve();
+  if (isNative && TTS) { TTS.stop().catch(() => {}); return; }
   try { window.speechSynthesis?.cancel(); } catch {}
 }
 

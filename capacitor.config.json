@@ -1,0 +1,10 @@
+{
+  "appId": "app.huroofi.kids",
+  "appName": "حروفي",
+  "webDir": "kids",
+  "android": {
+    "backgroundColor": "#8ecae6",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

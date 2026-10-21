@@ -5,6 +5,7 @@ import { SKILLS } from "./data.js";
 import { store } from "./store.js";
 import { render, $, esc, today, toArabicDigits, toast } from "./util.js";
 import { sfx } from "./sfx.js";
+import { isNative, saveFile } from "./native.js";
 
 // شهادة لكل مهارة عند بلوغ 80٪ من إتقانها، وشهادة للمواظبة
 const SKILL_CERT_TEXT = {
@@ -112,7 +113,7 @@ export async function screenCertificate(c, back) {
     </div>
     <div class="cert-view" id="print-area"><canvas id="cert"></canvas><img id="cert-img" alt="شهادة ${esc(c.title)}"></div>
     <div class="result-actions no-print">
-      <button class="btn block" id="dl">⬇️ تحميل الشهادة</button>
+      <button class="btn block" id="dl">${isNative ? "📤 حفظ أو مشاركة الشهادة" : "⬇️ تحميل الشهادة"}</button>
       <button class="btn alt block" id="print">🖨️ طباعة</button>
     </div>
   `);
@@ -124,14 +125,13 @@ export async function screenCertificate(c, back) {
   canvas.remove();
   sfx.sticker();
 
-  $("#dl").onclick = () => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `شهادة-${p.name || "حروفي"}-${c.title}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    toast("تم تحميل الشهادة ✔");
+  $("#dl").onclick = async () => {
+    try {
+      await saveFile(`شهادة-${p.name || "حروفي"}-${c.title}.png`, { dataUrl: url, mime: "image/png" });
+      if (!isNative) toast("تم تحميل الشهادة ✔");
+    } catch { toast("لم يتم الحفظ"); }
   };
+  // الطباعة المباشرة غير متاحة داخل التطبيق: الأهل يطبعون من نافذة المشاركة
+  if (isNative) $("#print").style.display = "none";
   $("#print").onclick = () => window.print();
 }

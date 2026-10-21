@@ -4,6 +4,7 @@
 import { LETTERS, HARAKAT, SKILLS } from "./data.js";
 import { store, MAX_BOX } from "./store.js";
 import { hasArabicVoice, sfx } from "./sfx.js";
+import { isNative, saveFile, openTtsInstall } from "./native.js";
 import { render, $, $$, esc, shuffle, today, toArabicDigits, toast, plural } from "./util.js";
 import { screenEditProfile, screenProfiles, skillsFor, activitiesFor } from "./main.js";
 
@@ -174,6 +175,7 @@ function screenReport(back) {
           <div class="seg">${[4, 6, 8, 10].map((v) => `<button class="${store.settings.rounds === v ? "on" : ""}" data-rounds="${v}">${n(v)}</button>`).join("")}</div>
         </div>
         <p class="muted">${hasArabicVoice() ? "✔ يوجد صوت عربي على هذا الجهاز." : "⚠️ لم نجد صوتاً عربياً على هذا الجهاز. يمكن إضافته من إعدادات الجهاز ← اللغة ← تحويل النص إلى كلام."}</p>
+        ${isNative && !hasArabicVoice() ? `<button class="btn alt small" id="tts-install">🔈 تثبيت الصوت العربي</button>` : ""}
       </div>
 
       <h3>👶 الملفات</h3>
@@ -186,7 +188,7 @@ function screenReport(back) {
         <button class="btn alt block danger" id="reset">🗑️ مسح تقدّم ${esc(p.name || "الطفل")}</button>
         ${store.profiles.length > 1 ? `<button class="btn alt block danger" id="delete">❌ حذف ملف ${esc(p.name || "الطفل")}</button>` : ""}
       </div>
-      <p class="muted center">كل البيانات محفوظة على هذا الجهاز فقط، ولا تُرسل إلى أي جهة.</p>
+      <p class="muted center">كل البيانات محفوظة على هذا الجهاز فقط، ولا تُرسل إلى أي جهة. · <a href="privacy.html">سياسة الخصوصية</a></p>
     </div>
   `);
 
@@ -203,6 +205,7 @@ function screenReport(back) {
   $("#edit").onclick = () => screenEditProfile(p.id, () => screenReport(back));
   $("#switch").onclick = screenProfiles;
   $("#export").onclick = exportBackup;
+  $("#tts-install")?.addEventListener("click", openTtsInstall);
   $("#import-file").onchange = (e) => importBackup(e.target.files[0], () => screenReport(back));
   $("#reset").onclick = () => {
     if (!confirm(`هل تريد مسح كل نجوم وتقدّم ${p.name || "الطفل"}؟ لا يمكن التراجع.`)) return;
@@ -223,16 +226,12 @@ function toggle(key, label) {
 }
 
 // ---------- النسخ الاحتياطي (ملف محلي) ----------
-function exportBackup() {
-  const blob = new Blob([JSON.stringify({ app: "huroofi", version: 2, saved: new Date().toISOString(), data: store.data }, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `huroofi-backup-${today()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  toast("تم حفظ النسخة الاحتياطية ✔");
+async function exportBackup() {
+  const text = JSON.stringify({ app: "huroofi", version: 2, saved: new Date().toISOString(), data: store.data }, null, 2);
+  try {
+    await saveFile(`huroofi-backup-${today()}.json`, { text, mime: "application/json" });
+    if (!isNative) toast("تم حفظ النسخة الاحتياطية ✔");
+  } catch { toast("لم يتم الحفظ"); }
 }
 
 function importBackup(file, done) {
