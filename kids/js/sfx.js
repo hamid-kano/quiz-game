@@ -15,19 +15,33 @@ if ("speechSynthesis" in window) {
   speechSynthesis.onvoiceschanged = pickVoice;
 }
 
-export const hasArabicVoice = () => !!arVoice;
+// بعض الأجهزة (خصوصاً أندرويد) لا تُعلن عن الصوت العربي في القائمة رغم أنها تنطق به.
+// لذلك نعتبر الجهاز "ينطق" إذا رأيناه ينطق فعلاً مرة واحدة على الأقل.
+let deviceSpeaks = false;
+try { deviceSpeaks = localStorage.getItem("huroofi-tts-ok") === "1"; } catch {}
+const markSpeaks = () => {
+  if (deviceSpeaks) return;
+  deviceSpeaks = true;
+  try { localStorage.setItem("huroofi-tts-ok", "1"); } catch {}
+};
 
-export const canHear = () => store.settings.speech && !!arVoice;
+export const hasArabicVoice = () => !!arVoice || deviceSpeaks;
+
+export const canHear = () => store.settings.speech && (!!arVoice || deviceSpeaks);
+
+// عبارة المديح تبدأ دائماً بكلمة تشجيع، حتى لا يظن الطفل أن السؤال يتكرر
+export const praiseText = (t) => (!t ? "" : /^(أحسنت|ممتاز|رائع|صحيح|جيد|برافو)/.test(t) ? t : `أحسنت! ${t}`);
 
 // ------------------------------------------------------------
 //  النطق: جملة واحدة فقط في كل لحظة.
-//  كل نطق جديد يلغي السابق، و speechDone() يعيد وعداً ينتهي عند انتهاء النطق الحالي
-//  (مع حدّ أقصى للوقت لأن بعض المتصفحات لا ترسل حدث الانتهاء أحياناً)
+//  كل نطق جديد يلغي السابق، و speechDone() يعيد وعداً ينتهي عند انتهاء النطق الحالي.
+//  لا نعتمد على حدث الانتهاء وحده: نراقب هل الجهاز ينطق فعلاً (speaking)،
+//  وننتظر حتى يتوقف، مع حدّ أقصى للأمان.
 // ------------------------------------------------------------
 let speechId = 0;
 let current = Promise.resolve();
 
-const estimateMs = (text, rate) => Math.min(7000, 600 + (text.length * 95) / rate);
+const estimateMs = (text, rate) => 700 + (text.length * 110) / rate;
 
 // slow = نطق أبطأ (للتمارين الصوتية عند الصغار)
 export function speak(text, { slow = false } = {}) {
@@ -39,7 +53,8 @@ export function speak(text, { slow = false } = {}) {
   const rate = slow ? 0.55 : 0.8;
   current = new Promise((resolve) => {
     let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
+    let poll = null;
+    const finish = () => { if (done) return; done = true; clearInterval(poll); resolve(); };
     try {
       speechSynthesis.cancel();
       // مهلة قصيرة بعد الإلغاء لأن بعض المتصفحات تتجاهل النطق الذي يأتي فوراً بعده
@@ -50,11 +65,25 @@ export function speak(text, { slow = false } = {}) {
         if (arVoice) u.voice = arVoice;
         u.rate = rate;
         u.pitch = 1.1;
-        u.onend = finish;
+        let started = false;
+        u.onstart = () => { started = true; markSpeaks(); };
+        u.onend = () => { if (started || deviceSpeaks || arVoice) finish(); };
         u.onerror = finish;
         speechSynthesis.speak(u);
-        // بدون صوت عربي قد لا يُنطق شيء، فلا ننتظر طويلاً
-        setTimeout(finish, arVoice ? estimateMs(text, rate) : 300);
+        const t0 = performance.now();
+        const maxMs = Math.min(14000, estimateMs(text, rate) * 1.8 + 1500);
+        poll = setInterval(() => {
+          if (id !== speechId) return finish();
+          const busy = speechSynthesis.speaking || speechSynthesis.pending;
+          if (busy && !started && performance.now() - t0 > 150) { started = true; markSpeaks(); }
+          const elapsed = performance.now() - t0;
+          // انتهى النطق فعلاً
+          if (started && !busy) return finish();
+          // لم يبدأ أي نطق خلال ثانية وربع: الجهاز لا ينطق، لا ننتظر
+          if (!started && elapsed > 1200) return finish();
+          // حدّ أقصى للأمان
+          if (elapsed > maxMs) finish();
+        }, 120);
       }, 60);
     } catch { finish(); }
   });

@@ -3,7 +3,7 @@
 // ============================================================
 import { LETTERS } from "./data.js";
 import { store } from "./store.js";
-import { speak, stopSpeech, speechDone, sfx, canHear } from "./sfx.js";
+import { speak, stopSpeech, speechDone, sfx, canHear, praiseText } from "./sfx.js";
 import { scoreTrace, frameOf } from "./tracecheck.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
@@ -146,7 +146,7 @@ function choiceRound(s, q) {
     if (o.right) {
       $$(".choice").forEach((b) => (b.disabled = true));
       btn.classList.add("right");
-      if (q.praise) speak(q.praise);
+      if (q.praise) speak(praiseText(q.praise));
       s.right(q);
     } else {
       btn.classList.add("wrong");
@@ -381,7 +381,7 @@ function buildRound(s, q) {
       if (pos === parts.length) {
         tileEls.forEach((b) => (b.disabled = true));
         if (q.hidePic || q.mystery) $("#pic").textContent = target.emoji;
-        speak(q.praise || `أحسنت! ${target.w}`);
+        speak(praiseText(q.praise || target.w));
         s.right(q, 1300);
       }
     } else {
