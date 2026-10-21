@@ -6,6 +6,9 @@ on:
     paths: ["kids/**", "android/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
   workflow_dispatch:
 
+permissions:
+  contents: write   # لنشر ملف APK في صفحة الإصدارات
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -40,6 +43,44 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           mv app/build/outputs/apk/debug/app-debug.apk "../huroofi-${VERSION_NAME}-test.apk"
+
+      # فحص ملف APK: الصلاحيات، والملفات الأساسية داخله، ورقم الإصدار
+      - name: Verify APK
+        run: |
+          APK="huroofi-${VERSION_NAME}-test.apk"
+          AAPT="$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)aapt2"
+          BADGING="$($AAPT dump badging "$APK")"
+          PERMS="$(echo "$BADGING" | grep uses-permission: | sed "s/.*name='\([^']*\)'.*/\1/" | tr '\n' ' ')"
+          PKG="$(echo "$BADGING" | grep -o "package: name='[^']*' versionCode='[^']*' versionName='[^']*'")"
+          SDK="$(echo "$BADGING" | grep -oE "(minSdkVersion|targetSdkVersion):'[0-9]+'" | tr '\n' ' ')"
+          LABEL="$(echo "$BADGING" | grep -o "application-label:'[^']*'")"
+          FILES=$(unzip -l "$APK" | grep -c "assets/public/")
+          SIZE=$(du -h "$APK" | cut -f1)
+          echo "::notice title=APK::$PKG | $SDK | $LABEL | size $SIZE | web files $FILES | permissions: $PERMS"
+          MISSING=""
+          for f in index.html privacy.html js/main.js js/native.js vendor/capacitor.js fonts/noto-naskh-arabic-arabic-700-normal.woff2 css/style.css; do
+            unzip -l "$APK" | grep -q "assets/public/$f" || MISSING="$MISSING $f"
+          done
+          if [ -n "$MISSING" ]; then echo "::error title=APK::missing files:$MISSING"; exit 1; fi
+          if echo "$PERMS" | grep -q "android.permission.INTERNET"; then echo "::error title=APK::INTERNET permission must not be present"; exit 1; fi
+          PLUGINS=$(unzip -p "$APK" assets/capacitor.plugins.json | tr -d '\n ' )
+          echo "::notice title=Plugins::$PLUGINS"
+
+      # رابط ثابت لتنزيل نسخة التجربة على الجوال مباشرة
+      - name: Publish test APK to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp "huroofi-${VERSION_NAME}-test.apk" huroofi.apk
+          NOTES="نسخة تجربة من تطبيق حروفي (الإصدار ${VERSION_NAME}). للتثبيت: نزّل ملف huroofi.apk على جوال أندرويد واسمح بالتثبيت من هذا المصدر."
+          if gh release view android-latest >/dev/null 2>&1; then
+            gh release edit android-latest --title "حروفي ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
+          else
+            gh release create android-latest --prerelease --title "حروفي ${VERSION_NAME} (نسخة تجربة لأندرويد)" --notes "$NOTES"
+          fi
+          gh release upload android-latest huroofi.apk --clobber
+          echo "::notice title=Download::https://github.com/${{ github.repository }}/releases/download/android-latest/huroofi.apk"
 
       # نسخة المتجر: تُبنى فقط إذا أُضيف مفتاح التوقيع في أسرار المستودع
       - name: Build signed store bundle (AAB)
