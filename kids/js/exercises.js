@@ -15,6 +15,32 @@ const byLetter = Object.fromEntries(LETTERS.map((L) => [L.l, L]));
 const big = () => store.active.age === "big";
 const optionCount = () => (big() ? 4 : 3);
 
+// شكل كل حرف داخل الكلمة حسب اتصاله بما قبله وما بعده
+const joinsNext = (ch) => (byLetter[ch] ? byLetter[ch].c : !["ة", "ى", "ء", "ا", "إ", "آ"].includes(ch));
+export function wordForms(w) {
+  const chars = [...w];
+  const T = "\u0640";
+  return chars.map((ch, i) => {
+    const prev = i > 0 && joinsNext(chars[i - 1]);
+    const next = i < chars.length - 1 && joinsNext(ch);
+    return (prev ? T : "") + ch + (next ? T : "");
+  });
+}
+// مشتّتان: الحرف نفسه بشكل خاطئ، وحرف آخر
+function formDistractors(w, parts) {
+  const T = "\u0640";
+  const out = [];
+  const chars = [...w];
+  const k = Math.floor(Math.random() * chars.length);
+  const ch = chars[k];
+  for (const f of shuffle([ch, ch + T, T + ch + T, T + ch])) {
+    if (!parts.includes(f) && (byLetter[ch]?.c || !f.endsWith(T))) { out.push(f); break; }
+  }
+  const other = randomOf(LETTERS.filter((L) => !chars.includes(L.l)));
+  out.push(other.c ? T + other.l + T : T + other.l);
+  return out;
+}
+
 // اختيار نوع السؤال حسب أوزان مختلفة للصغار والكبار
 function variant(table) {
   const list = Object.entries(table).map(([k, w]) => [k, Array.isArray(w) ? w[big() ? 1 : 0] : w]).filter(([, w]) => w > 0);
@@ -396,12 +422,13 @@ export const GEN = {
     };
   },
 
-  // ---------------- تركيب الكلمة ----------------
+  // ---------------- تركيب الكلمة بالضغط على الحروف ----------------
   build(level) {
     const pool = level?.words === "long" ? WORDS_LONG : WORDS_SHORT;
     const [target] = store.pickWeighted(pool, (w) => "sp:" + w.w);
-    if (variant({ tiles: 3, missing: 2 }) === "missing") {
-      const chars = [...target.w];
+    const chars = [...target.w];
+    const v = variant({ tiles: 3, missing: 2, forms: 2, given: 2 });
+    if (v === "missing") {
       const idxs = chars.map((c, i) => (byLetter[c] ? i : -1)).filter((i) => i >= 0);
       const k = randomOf(idxs);
       const t = byLetter[chars[k]];
@@ -414,7 +441,43 @@ export const GEN = {
         praise: `أحسنت! ${target.w}`
       };
     }
+    if (v === "forms") {
+      // البطاقات بأشكال الحروف كما تُكتب داخل الكلمة (أول/وسط/آخر)
+      const parts = wordForms(target.w);
+      const extras = formDistractors(target.w, parts);
+      return { kind: "build", key: "sp:" + target.w, word: target, parts, shown: chars, extras,
+        title: "ركّب الكلمة بأشكال الحروف كما تُكتب" };
+    }
+    if (v === "given") {
+      return { kind: "build", key: "sp:" + target.w, word: target, given: 1, title: "أكمل الكلمة: الحرف الأول جاهز" };
+    }
     return { kind: "build", key: "sp:" + target.w, word: target };
+  },
+
+  // كلمتي الأولى: للصغار، حروف باهتة داخل الخانات ليطابق الطفل الشكل
+  buildFirst() {
+    const pool = WORDS_SHORT.filter((w) => [...w.w].length <= 3);
+    const [target] = store.pickWeighted(pool, (w) => "sp:" + w.w);
+    const extras = big() ? pick(LETTERS.map((x) => x.l).filter((l) => !target.w.includes(l)), 1) : [];
+    return { kind: "build", key: "sp:" + target.w, word: target, ghost: true, extras, slow: !big(),
+      title: "طابق الحروف وركّب الكلمة" };
+  },
+
+  // رتّب الحروف: كلمة مبعثرة بلا صورة ولا صوت، والصورة تلميح بعد خطأين
+  anagram() {
+    const pool = ALL_WORDS.filter((w) => [...w.w].length >= 3 && [...w.w].length <= 5 && new Set(w.w).size === [...w.w].length);
+    const [target] = store.pickWeighted(pool, (w) => "ana:" + w.w);
+    return { kind: "build", key: "ana:" + target.w, word: target, mystery: true, extras: [],
+      title: "رتّب الحروف لتكوّن كلمة" };
+  },
+
+  // لوحة المفاتيح: اكتب الكلمة كاملة بنفسك
+  keyboard(level) {
+    const pool = ALL_WORDS.filter((w) => [...w.w].length <= (level?.mode === "dict" ? 4 : 5));
+    const [target] = store.pickWeighted(pool, (w) => "kb:" + w.w);
+    return level?.mode === "dict"
+      ? { kind: "keyboard", key: "kb:" + target.w, word: target, hidePic: true, title: "اسمع الكلمة واكتبها بلوحة الحروف" }
+      : { kind: "keyboard", key: "kb:" + target.w, word: target, title: "اكتب اسم الصورة بلوحة الحروف" };
   },
 
   // ---------------- القراءة ----------------
@@ -588,14 +651,42 @@ export const GEN = {
     return { kind: "order", key: `ord:${st.id}:${start}`, story: st, pages };
   },
 
-  // ---------------- الرسم ----------------
+  // ---------------- الكتابة بالإصبع ----------------
+  // mode: letters (فوق الخط) · numbers · memory (من الذاكرة) · free (اسمع واكتب بلا خط) · word (كلمة) · name (اسمك)
   trace(level) {
-    if (level?.mode === "numbers") {
+    const mode = level?.mode || "letters";
+    if (mode === "numbers") {
       const nums = NUMBERS.slice(0, big() ? 9 : 5).map((n) => ({ l: n.d, name: n.name, num: true }));
       const [t] = store.pickWeighted(nums, (x) => "trcn:" + x.l);
-      return { kind: "trace", key: "trcn:" + t.l, letter: t };
+      return { kind: "trace", key: "trcn:" + t.l, letter: t, guide: big() && Math.random() < 0.3 ? "memory" : "full" };
+    }
+    if (mode === "word") {
+      const pool = ALL_WORDS.filter((w) => [...w.w].length >= 2 && [...w.w].length <= (big() ? 4 : 3));
+      const [w] = store.pickWeighted(pool, (x) => "trw:" + x.w);
+      const g = big() ? variant({ full: 3, memory: 1 }) : "full";
+      return { kind: "trace", key: "trw:" + w.w, text: w.w, pic: w.emoji, guide: g,
+        title: g === "memory" ? `انظر جيداً ثم اكتب كلمة <b>${w.w}</b> من ذاكرتك` : `اكتب كلمة <b>${w.w}</b> فوق الخط` };
+    }
+    if (mode === "name") {
+      const raw = (store.active.name || "").trim().split(/\s+/)[0] || "";
+      const ok = /^[\u0621-\u064A]{2,8}$/.test(raw);
+      const text = ok ? raw : randomOf(WORDS_SHORT).w;
+      return { kind: "trace", key: "trn:" + text, text, pic: ok ? store.active.avatar : "",
+        title: ok ? `اكتب اسمك: <b>${text}</b>` : `اكتب كلمة <b>${text}</b> (أضف اسمك بالعربية من ملفك لتكتبه هنا)`,
+        say: ok ? `اكتب اسمك، ${text}` : text };
     }
     const [target] = store.pickWeighted(LETTERS, (L) => "trc:" + L.l);
+    if (mode === "memory") return { kind: "trace", key: "trm:" + target.l, letter: target, guide: "memory" };
+    if (mode === "free") {
+      return { kind: "trace", key: "trf:" + target.l, letter: target, guide: "none",
+        title: `اسمع واكتب الحرف بنفسك`, say: `اكتب حرف ${target.name}` };
+    }
+    // فوق الخط: للكبار أحياناً بشكل الحرف داخل الكلمة
+    if (big() && target.c && Math.random() < 0.35) {
+      const [label, shape] = randomOf(letterForms(target).slice(1));
+      return { kind: "trace", key: "trc:" + target.l, text: shape, letter: target,
+        title: `ارسم حرف <b>${target.name}</b> في <b>${label}</b> الكلمة`, say: `حرف ${target.name} في ${label} الكلمة` };
+    }
     return { kind: "trace", key: "trc:" + target.l, letter: target };
   },
 

@@ -4,6 +4,7 @@
 import { LETTERS } from "./data.js";
 import { store } from "./store.js";
 import { speak, stopSpeech, speechDone, sfx, canHear } from "./sfx.js";
+import { scoreTrace, frameOf } from "./tracecheck.js";
 import { shuffle, pick, randomOf, esc, render, $, $$, toast, letterForms, toArabicDigits } from "./util.js";
 
 
@@ -26,6 +27,10 @@ export function runSession(opt) {
   // qid: رقم السؤال الحالي، answered: هل أجاب الطفل عليه
   // نستخدمهما حتى لا يُنطق سؤال قديم بعد الإجابة أو بعد الانتقال
   const s = { ...opt, round: 0, results: [], mistakes: 0, missed: false, seen: new Set(), qid: 0, answered: false, ended: false };
+
+  // نزيل احتفال الشاشة السابقة حتى لا يغطي التمرين الجديد
+  const conf = document.getElementById("confetti");
+  if (conf) conf.innerHTML = "";
 
   clearInterval(tickTimer);
   tickTimer = setInterval(() => { if (!document.hidden) store.addSeconds(5); }, 5000);
@@ -80,6 +85,7 @@ export function runSession(opt) {
     s.seen.add(q.key);
     if (q.kind === "build") buildRound(s, q);
     else if (q.kind === "memory") memoryRound(s, q);
+    else if (q.kind === "keyboard") keyboardRound(s, q);
     else if (q.kind === "hunt") huntRound(s, q);
     else if (q.kind === "order") orderRound(s, q);
     else if (q.kind === "trace") traceRound(s, q);
@@ -309,30 +315,38 @@ function orderRound(s, q) {
 
 // ---------- ركّب الكلمة ----------
 // q.word = { w, emoji }
-// اختياري: q.parts (مقاطع أو حروف بالترتيب)، q.extras (بطاقات مشتّتة)، q.title،
-// q.hidePic (للإملاء: تظهر الصورة بعد الإكمال فقط)، q.sayParts (نطق كل جزء عند وضعه)، q.slow، q.praise
+// اختياري:
+//  q.parts   أجزاء الكلمة بالترتيب (حروف أو مقاطع أو أشكال الحروف)، الافتراضي حروف الكلمة
+//  q.extras  بطاقات مشتّتة · q.title · q.slow · q.praise · q.sayParts (نطق كل جزء)
+//  q.hidePic (إملاء: تظهر الصورة عند الإكمال) · q.mystery (الصورة مخفية وتظهر كتلميح بعد خطأين، بلا صوت)
+//  q.ghost   (حروف باهتة داخل الخانات للمطابقة، للصغار) · q.given (عدد الأجزاء المعطاة مسبقاً)
+//  q.shown   ما يُعرض في المعاينة لكل جزء (مثلاً الحرف المجرد بدل شكله)
 function buildRound(s, q) {
   const target = q.word;
   const parts = q.parts || [...target.w];
+  const shown = q.shown || parts;
+  const given = q.given || 0;
   const syllables = !!q.parts && q.parts.some((x) => [...x].length > 1);
   const extra = q.extras || pick(LETTERS.map((x) => x.l).filter((l) => !parts.includes(l)), store.active.age === "big" ? 2 : 1);
-  const tiles = shuffle([...parts, ...extra]);
-  let pos = 0;
+  const tiles = shuffle([...parts.slice(given), ...extra]);
+  let pos = given;
   let wrongCount = 0;
+  let totalWrong = 0;
+  const picHtml = q.hidePic ? "👂" : q.mystery ? "❓" : target.emoji;
 
   render(`
     ${header(s)}
     <div class="prompt">
       <div class="q">${q.title || "ركّب الكلمة"}</div>
-      <div class="pic" id="pic">${q.hidePic ? "👂" : target.emoji}</div>
-      <div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>
-      ${parentNote(target.w)}
-      <div class="slots ${syllables ? "syl" : ""}">${parts.map(() => `<div class="slot"></div>`).join("")}</div>
-      <div class="built-word" id="built" aria-live="polite"></div>
+      <div class="pic" id="pic">${picHtml}</div>
+      ${q.mystery ? "" : `<div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>${parentNote(target.w)}`}
+      <div class="slots ${syllables ? "syl" : ""}">${parts.map((p, i) => `<div class="slot ${i < given ? "filled given" : ""} ${q.ghost && i >= given ? "ghost" : ""}" ${q.ghost ? `data-ghost="${esc(p)}"` : ""}>${i < given ? p : ""}</div>`).join("")}</div>
+      <div class="built-word" id="built" aria-live="polite">${shown.slice(0, given).join("")}</div>
     </div>
     <div class="tiles ${syllables ? "syl" : ""}">${tiles.map((t, i) => `<button class="tile" data-i="${i}">${t}</button>`).join("")}</div>
   `);
-  bindCommon(s, target.w, q.slow);
+  if (q.mystery) $("#back").onclick = s.exit;
+  else bindCommon(s, target.w, q.slow);
 
   const slots = $$(".slot");
   const tileEls = $$(".tile");
@@ -345,13 +359,14 @@ function buildRound(s, q) {
       btn.classList.add("used");
       slots[pos].textContent = t;
       slots[pos].classList.add("filled");
+      slots[pos].classList.remove("ghost");
       pos++;
       wrongCount = 0;
       tileEls.forEach((b) => b.classList.remove("hint"));
-      $("#built").textContent = pos === parts.length ? target.w : parts.slice(0, pos).join("");
+      $("#built").textContent = pos === parts.length ? target.w : shown.slice(0, pos).join("");
       if (pos === parts.length) {
         tileEls.forEach((b) => (b.disabled = true));
-        if (q.hidePic) $("#pic").textContent = target.emoji;
+        if (q.hidePic || q.mystery) $("#pic").textContent = target.emoji;
         speak(q.praise || `أحسنت! ${target.w}`);
         s.right(q, 1300);
       }
@@ -361,6 +376,8 @@ function buildRound(s, q) {
       btn.classList.add("wrong");
       if (q.sayParts) speak(t, { slow: true });
       s.wrong(parts[pos], t);
+      totalWrong++;
+      if (q.mystery && totalWrong === 2) { $("#pic").textContent = target.emoji; toast("تلميح: هذه صورة الكلمة 💡"); }
       if (++wrongCount >= 2) {
         const hintEl = tileEls.find((b, i) => tiles[i] === parts[pos] && !b.classList.contains("used"));
         hintEl?.classList.add("hint");
@@ -369,16 +386,89 @@ function buildRound(s, q) {
   }));
 }
 
-// ---------- ارسم الحرف ----------
+// ---------- لوحة المفاتيح: اكتب الكلمة كاملة بالضغط على الحروف ----------
+const KEYS = ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي", "ة", "أ", "ى", "ء", "ئ", "ؤ"];
+function keyboardRound(s, q) {
+  const target = q.word;
+  const letters = [...target.w];
+  let typed = [];
+  let tries = 0;
+
+  render(`
+    ${header(s)}
+    <div class="prompt">
+      <div class="q">${q.title || "اكتب اسم الصورة"}</div>
+      <div class="pic" id="pic">${q.hidePic ? "👂" : target.emoji}</div>
+      <div class="say-row"><button class="speak" id="say">🔊 استمع</button></div>
+      ${parentNote(target.w)}
+      <div class="slots kb-slots">${letters.map(() => `<div class="slot"></div>`).join("")}</div>
+      <div class="built-word" id="built" aria-live="polite"></div>
+    </div>
+    <div class="keyboard">
+      ${KEYS.map((k) => `<button class="key" data-k="${k}">${k}</button>`).join("")}
+      <button class="key back-key" id="bs" aria-label="حذف">⌫</button>
+    </div>
+  `);
+  bindCommon(s, target.w, true);
+  const slots = $$(".slot");
+  const keyEls = $$(".key[data-k]");
+  const paint = () => {
+    slots.forEach((sl, i) => { sl.textContent = typed[i] || ""; sl.classList.toggle("filled", !!typed[i]); sl.classList.remove("bad", "good"); });
+    $("#built").textContent = typed.join("");
+  };
+  const check = () => {
+    if (typed.join("") === target.w) {
+      slots.forEach((sl) => sl.classList.add("good"));
+      keyEls.forEach((b) => (b.disabled = true));
+      if (q.hidePic) $("#pic").textContent = target.emoji;
+      speak(`أحسنت! ${target.w}`);
+      s.right(q, 1300);
+      return;
+    }
+    tries++;
+    const firstBad = typed.findIndex((ch, i) => ch !== letters[i]);
+    s.wrong(letters[firstBad], typed[firstBad]);
+    typed.forEach((ch, i) => slots[i].classList.add(ch === letters[i] ? "good" : "bad"));
+    speak(target.w, { slow: true });
+    // نُبقي الحروف الصحيحة في أماكنها ونمسح ما بعد أول خطأ
+    setTimeout(() => {
+      typed = typed.slice(0, firstBad);
+      paint();
+      if (tries >= 2) keyEls.find((b) => b.dataset.k === letters[typed.length])?.classList.add("hint");
+    }, 900);
+  };
+  keyEls.forEach((b) => (b.onclick = () => {
+    if (s.answered || typed.length >= letters.length) return;
+    sfx.tap();
+    keyEls.forEach((x) => x.classList.remove("hint"));
+    typed.push(b.dataset.k);
+    paint();
+    if (typed.length === letters.length) setTimeout(check, 250);
+  }));
+  $("#bs").onclick = () => { if (s.answered) return; typed.pop(); paint(); };
+}
+
+// q.letter = { l, name, num }  أو كلمة: q.text
+// q.guide: "full" (الخط الرمادي ظاهر) | "memory" (يظهر ثوانٍ ثم يختفي) | "none" (كتابة حرّة)
+// في الكتابة الحرّة وكتابة الذاكرة نقارن الشكل بعد تحجيم الرسم ليطابق حجم الحرف ومكانه
 function traceRound(s, q) {
-  const L = q.letter;
+  const L = q.letter || {};
+  const text = q.text || L.l;
+  let guideMode = q.guide || "full";
+  let free = guideMode !== "full";
+  let failed = 0;
+  const kind = q.text ? "الكلمة" : L.num ? "رقم" : "حرف";
+  const title = q.title || (guideMode === "none" ? `اكتب ${kind} <b>${esc(L.name || text)}</b> بنفسك` : guideMode === "memory" ? `انظر جيداً ثم اكتب ${kind} <b>${esc(L.name || text)}</b> من ذاكرتك` : `ارسم ${kind} <b>${esc(L.name || text)}</b> فوق الخط الرمادي`);
+  const sayText = q.say || (q.text ? text : `${L.num ? "رقم" : "حرف"} ${L.name}`);
   render(`
     ${header(s)}
     <div class="prompt compact">
-      <div class="q">ارسم ${L.num ? "رقم" : "حرف"} <b>${L.name}</b> فوق الخط الرمادي</div>
-      <div class="say-row"><button class="speak" id="say">🔊 ${L.num ? "رقم" : "حرف"} ${L.name}</button></div>
+      <div class="q">${title}</div>
+      ${q.pic ? `<div class="pic small-pic">${q.pic}</div>` : ""}
+      <div class="say-row"><button class="speak" id="say">🔊 استمع</button>${guideMode === "memory" ? ` <button class="speak alt" id="peek">👀 أرني مرة أخرى</button>` : ""}</div>
+      ${parentNote(sayText)}
     </div>
-    <div class="trace-wrap" id="wrap">
+    <div class="trace-wrap ${guideMode === "none" ? "lined" : ""}" id="wrap">
       <canvas id="guide"></canvas>
       <canvas id="draw" aria-label="لوحة الرسم"></canvas>
     </div>
@@ -387,7 +477,7 @@ function traceRound(s, q) {
       <button class="btn small" id="check">✔ تحقّق</button>
     </div>
   `);
-  bindCommon(s, `${L.num ? "رقم" : "حرف"} ${L.name}`);
+  bindCommon(s, sayText, !!q.text);
 
   const wrap = $("#wrap");
   const guide = $("#guide");
@@ -401,56 +491,100 @@ function traceRound(s, q) {
   dctx.scale(dpr, dpr);
 
   const font = (px) => `700 ${px}px "Naskh", "Cairo", serif`;
+  // حجم الخط: كبير للحرف، ويصغر للكلمة حتى تتسع داخل اللوحة
+  const fontSize = (ctx, sz) => {
+    let px = sz * 0.62;
+    ctx.font = font(px);
+    const w = ctx.measureText(text).width;
+    if (w > sz * 0.86) px *= (sz * 0.86) / w;
+    return px;
+  };
   const place = (ctx, sz) => {
-    ctx.font = font(sz * 0.62);
+    const px = fontSize(ctx, sz);
+    ctx.font = font(px);
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    const m = ctx.measureText(L.l);
-    const asc = m.actualBoundingBoxAscent || sz * 0.3;
+    const m = ctx.measureText(text);
+    const asc = m.actualBoundingBoxAscent || px * 0.5;
     const desc = m.actualBoundingBoxDescent || 0;
-    return { x: sz / 2, y: sz / 2 + (asc - desc) / 2 };
+    return { x: sz / 2, y: sz / 2 + (asc - desc) / 2, px };
   };
-  const drawLetter = (ctx, sz, color, outline = 0) => {
+  const drawText = (ctx, sz, color, outline = 0) => {
     ctx.clearRect(0, 0, sz, sz);
-    const { x, y } = place(ctx, sz);
+    const pl = place(ctx, sz);
     ctx.fillStyle = color;
-    ctx.fillText(L.l, x, y);
-    if (outline) { ctx.lineWidth = outline; ctx.strokeStyle = color; ctx.lineJoin = "round"; ctx.strokeText(L.l, x, y); }
-    return { x, y };
+    ctx.fillText(text, pl.x, pl.y);
+    if (outline) { ctx.lineWidth = outline * pl.px / (sz * 0.62); ctx.strokeStyle = color; ctx.lineJoin = "round"; ctx.strokeText(text, pl.x, pl.y); }
+    return pl;
   };
-  const paintGuide = () => {
-    const { x, y } = drawLetter(gctx, size, "#e3ebf2");
-    gctx.setLineDash([6, 8]);
-    gctx.lineWidth = 2;
-    gctx.strokeStyle = "#9fb3c6";
-    gctx.strokeText(L.l, x, y);
-    gctx.setLineDash([]);
+  // إطار الكتابة في وضع الذاكرة والكتابة الحرّة: يبقى ظاهراً ليعرف الطفل أين يكتب
+  const frame = frameOf(text);
+  const paintFrame = () => {
+    if (!free) return;
+    gctx.save();
+    gctx.setLineDash([10, 8]);
+    gctx.lineWidth = 3;
+    gctx.strokeStyle = "#b9a7e8";
+    const r = 18;
+    const x = frame.x * size, y = frame.y * size, w = frame.w * size, h = frame.h * size;
+    gctx.beginPath();
+    gctx.roundRect ? gctx.roundRect(x, y, w, h, r) : gctx.rect(x, y, w, h);
+    gctx.stroke();
+    gctx.restore();
   };
-  paintGuide();
-  document.fonts?.load(font(40), L.l).then(paintGuide).catch(() => {});
+  const paintGuide = (show = true) => {
+    gctx.clearRect(0, 0, size, size);
+    if (show) {
+      const { x, y } = drawText(gctx, size, "#e3ebf2");
+      gctx.setLineDash([6, 8]);
+      gctx.lineWidth = 2;
+      gctx.strokeStyle = "#9fb3c6";
+      gctx.strokeText(text, x, y);
+      gctx.setLineDash([]);
+    }
+    paintFrame();
+  };
+  let guideVisible = guideMode !== "none";
+  let hideTimer = null;
+  const showGuide = () => {
+    paintGuide(true);
+    if (guideMode === "memory") {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { guideVisible = false; paintGuide(false); }, 2500);
+    }
+  };
+  if (guideVisible) showGuide(); else paintGuide(false);
+  document.fonts?.load(font(40), text).then(() => paintGuide(guideVisible)).catch(() => {});
+  $("#peek")?.addEventListener("click", () => { guideVisible = true; showGuide(); });
 
   const strokes = [];
   let cur = null;
-  const lineW = size * 0.075;
+  const lineW = () => Math.max(size * 0.035, place(dctx, size).px * 0.12);
+  const LW = lineW();
   const pt = (e) => {
     const r = draw.getBoundingClientRect();
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   };
-  const paintStrokes = (ctx, sz, w, color) => {
+  const paintStrokes = (ctx, sz, w, color, list = strokes) => {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.lineWidth = w;
     ctx.strokeStyle = color;
-    strokes.forEach((st) => {
+    list.forEach((st) => {
       ctx.beginPath();
       st.forEach((p, i) => (i ? ctx.lineTo(p.x * sz, p.y * sz) : ctx.moveTo(p.x * sz, p.y * sz)));
       if (st.length === 1) ctx.lineTo(st[0].x * sz + 0.1, st[0].y * sz);
       ctx.stroke();
     });
   };
-  const repaint = () => { dctx.clearRect(0, 0, size, size); paintStrokes(dctx, size, lineW, "#fb8500"); };
+  const repaint = () => { dctx.clearRect(0, 0, size, size); paintStrokes(dctx, size, LW, "#fb8500"); };
 
-  draw.addEventListener("pointerdown", (e) => { draw.setPointerCapture(e.pointerId); cur = [pt(e)]; strokes.push(cur); repaint(); });
+  draw.addEventListener("pointerdown", (e) => {
+    draw.setPointerCapture(e.pointerId);
+    // في وضع الذاكرة يختفي الخط بمجرد أن يبدأ الطفل الكتابة
+    if (guideMode === "memory" && guideVisible) { clearTimeout(hideTimer); guideVisible = false; paintGuide(false); }
+    cur = [pt(e)]; strokes.push(cur); repaint();
+  });
   draw.addEventListener("pointermove", (e) => { if (!cur) return; cur.push(pt(e)); repaint(); });
   const end = () => { cur = null; };
   draw.addEventListener("pointerup", end);
@@ -458,39 +592,46 @@ function traceRound(s, q) {
 
   $("#clear").onclick = () => { strokes.length = 0; repaint(); };
 
-  $("#check").onclick = () => {
-    const pts = strokes.reduce((n, st) => n + st.length, 0);
-    if (pts < 8) { toast("ارسم الحرف أولاً ✏️"); return; }
-
-    // نقارن الرسم بشكل الحرف على شبكة صغيرة:
-    // التغطية = كم من الحرف رُسم، الدقة = كم من الرسم داخل الحرف
-    const N = 120;
-    const mk = () => { const c = document.createElement("canvas"); c.width = c.height = N; return c.getContext("2d", { willReadFrequently: true }); };
-    const mask = mk(); drawLetter(mask, N, "#000", N * 0.06);
-    const core = mk(); drawLetter(core, N, "#000");
-    const user = mk(); paintStrokes(user, N, N * 0.075, "#000");
-    const m = mask.getImageData(0, 0, N, N).data;
-    const c = core.getImageData(0, 0, N, N).data;
-    const u = user.getImageData(0, 0, N, N).data;
-    let coreTotal = 0, coreHit = 0, userTotal = 0, userIn = 0;
-    for (let i = 3; i < m.length; i += 4) {
-      const inUser = u[i] > 40;
-      if (c[i] > 40) { coreTotal++; if (inUser) coreHit++; }
-      if (inUser) { userTotal++; if (m[i] > 40) userIn++; }
+  // حدود مربع يحيط بالبكسلات المرسومة في شبكة N×N
+  const bbox = (data, N) => {
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (data[(y * N + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     }
-    const coverage = coreHit / Math.max(coreTotal, 1);
-    const precision = userIn / Math.max(userTotal, 1);
+    return x1 < 0 ? null : { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  };
 
-    if (coverage >= 0.45 && precision >= 0.6) {
+  $("#check").onclick = () => {
+    if (s.answered) return;
+    const pts = strokes.reduce((n, st) => n + st.length, 0);
+    if (pts < 8) { toast(q.text ? "اكتب الكلمة أولاً ✏️" : "ارسم الحرف أولاً ✏️"); return; }
+
+    const sc = scoreTrace(text, strokes, free, LW / size);
+
+    if (sc.pass) {
       $("#check").disabled = true;
       $("#clear").disabled = true;
+      // نُظهر الشكل الصحيح بعد النجاح ليقارن الطفل
+      paintGuide(true);
       dctx.clearRect(0, 0, size, size);
-      paintStrokes(dctx, size, lineW, "#2bb673");
-      speak("رائع!");
+      paintStrokes(dctx, size, LW, "#2bb673");
+      speak(q.text ? `رائع! ${text}` : "رائع!");
       s.right(q, 1100);
     } else {
       s.wrong(null, null);
-      toast(coverage < 0.45 ? "ارسم الحرف كاملاً 💪" : "حاول أن تبقى فوق الحرف 🙂");
+      failed++;
+      if (free && failed >= 2) {
+        // بعد محاولتين في الكتابة الحرّة: نُظهر الخط المساعد ليتتبّعه الطفل بدل أن يعلق
+        guideMode = "full";
+        free = false;
+        guideVisible = true;
+        paintGuide(true);
+        toast("انظر للشكل وارسمه فوق الخط ✍️");
+      } else {
+        toast(sc.reason === "ink" ? "اكتب الشكل فقط بدون تلوين 🙂" : sc.reason === "coverage" ? (q.text ? "اكتب الكلمة كاملة 💪" : "ارسم الحرف كاملاً 💪") : (free ? "اكتب داخل الإطار بشكل أدق 🙂" : "حاول أن تبقى فوق الخط 🙂"));
+        // بعد المحاولة الخاطئة نُري الشكل الصحيح لحظات
+        if (free) { guideVisible = true; paintGuide(true); setTimeout(() => { if (!s.answered && free) { guideVisible = false; paintGuide(false); } }, 1800); }
+      }
       setTimeout(() => { strokes.length = 0; repaint(); }, 700);
     }
   };

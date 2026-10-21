@@ -542,3 +542,23 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 .slots.syl .slot { width: auto; min-width: 64px; padding: 0 8px; }
 .tiles.syl .tile { width: auto; min-width: 76px; padding: 0 12px; font-size: 34px; }
 .choice small { display: block; font-family: "Cairo", sans-serif; font-size: 13px; color: var(--muted); font-weight: 700; }
+
+/* ---------- الكتابة: لوحة الحروف والخانات ---------- */
+.slot.ghost::before { content: attr(data-ghost); color: #c3d6e4; }
+.slot.given { background: #eef2f6; border-color: #b8cfe0; }
+.slot.good { border-color: var(--good); background: #e5f8ee; }
+.slot.bad { border-color: var(--bad); background: #fde6ec; animation: shake .4s; }
+.kb-slots .slot { width: 46px; height: 56px; font-size: 30px; }
+.keyboard { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; direction: rtl; }
+.key {
+  aspect-ratio: 1 / 1.15; border: 0; border-radius: 12px; background: #fff; color: var(--ink); cursor: pointer;
+  font-family: var(--letter-font); font-size: 24px; box-shadow: 0 4px 0 var(--shadow); padding: 0;
+}
+.key:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+.key.hint { animation: hintPulse 1s ease-in-out infinite; background: #e5f8ee; }
+.key.back-key { grid-column: span 2; aspect-ratio: auto; background: #ffe1e8; font-family: "Cairo", sans-serif; font-size: 22px; }
+.trace-wrap.lined {
+  background-image: repeating-linear-gradient(180deg, transparent 0 calc(33.33% - 1px), #dbe7f0 calc(33.33% - 1px) 33.33%);
+}
+.speak.alt { background: #fff; color: var(--purple); box-shadow: 0 5px 0 var(--shadow); }
+@media (max-width: 360px) { .key { font-size: 20px; } .keyboard { gap: 4px; } }

@@ -185,13 +185,23 @@ export const SKILLS = [
   },
   {
     id: "writing", icon: "✏️", name: "الكتابة", color: "#219ebc",
-    goal: "يتدرّب على رسم الحروف والأرقام بيده، ثم تهجئة الكلمات",
-    prefixes: ["trc:", "trcn:", "sp:", "miss:"], target: 40,
+    goal: "يكتب الحروف والكلمات بيده، ويبني الكلمات بالضغط على الحروف حتى يكتبها كاملة بنفسه",
+    prefixes: ["trc:", "trcn:", "trm:", "trf:", "trw:", "trn:", "sp:", "miss:", "ana:", "kb:"], target: 70,
     activities: [
-      { id: "trace", type: "trace", mode: "letters", title: "ارسم الحروف", desc: "تتبّع الحرف بإصبعك", icon: "✍️", age: "all" },
+      // كتابة الحروف والكلمات بالإصبع
+      { id: "trace", type: "trace", mode: "letters", title: "ارسم الحروف", desc: "تتبّع الحرف فوق الخط", icon: "✍️", age: "all" },
       { id: "traceNum", type: "trace", mode: "numbers", title: "ارسم الأرقام", desc: "تتبّع الرقم بإصبعك", icon: "🔢", age: "all" },
+      { id: "traceWord", type: "trace", mode: "word", title: "اكتب الكلمة", desc: "اكتب كلمة كاملة فوق الخط", icon: "🖊️", age: "all" },
+      { id: "traceName", type: "trace", mode: "name", title: "اكتب اسمك", desc: "تعلّم كتابة اسمك بيدك", icon: "🪪", age: "all" },
+      { id: "traceMemory", type: "trace", mode: "memory", title: "من الذاكرة", desc: "انظر للحرف ثم اكتبه وهو مخفي", icon: "🧠", age: "big" },
+      { id: "traceFree", type: "trace", mode: "free", title: "اسمع واكتب الحرف", desc: "اكتب الحرف بلا خط مساعد", icon: "👂", age: "big" },
+      // بناء الكلمة بالضغط على الحروف
+      { id: "buildFirst", type: "buildFirst", title: "كلمتي الأولى", desc: "طابق الحروف وركّب الكلمة", icon: "🧸", age: "all" },
       { id: "build", type: "build", title: "ركّب الكلمة", desc: "كلمات من 2–3 حروف", words: "short", icon: "🧩", age: "big" },
-      { id: "build2", type: "build", title: "كلمات أطول", desc: "كلمات من 4–5 حروف", words: "long", icon: "🏗️", age: "big" }
+      { id: "build2", type: "build", title: "كلمات أطول", desc: "كلمات من 4–5 حروف", words: "long", icon: "🏗️", age: "big" },
+      { id: "anagram", type: "anagram", title: "رتّب الحروف", desc: "حروف مبعثرة، ما الكلمة؟", icon: "🔀", age: "big" },
+      { id: "keyboard", type: "keyboard", title: "لوحة الحروف", desc: "اكتب اسم الصورة حرفاً حرفاً", icon: "⌨️", age: "big" },
+      { id: "keyboardDict", type: "keyboard", mode: "dict", title: "إملاء بلوحة الحروف", desc: "اسمع واكتب بلا صورة", icon: "📝", age: "big" }
     ]
   },
   {

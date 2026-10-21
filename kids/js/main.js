@@ -212,6 +212,7 @@ export function startActivity(act) {
     act.type === "trace" ? Math.min(4, store.settings.rounds)
     : act.type === "memory" ? 3
     : act.type === "order" ? Math.min(4, store.settings.rounds)
+    : act.type === "keyboard" || act.type === "anagram" ? Math.min(5, store.settings.rounds)
     : store.settings.rounds;
   runSession({
     title: act.title,
