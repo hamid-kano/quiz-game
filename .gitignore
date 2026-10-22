@@ -8,6 +8,8 @@ android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
 *.keystore
 *.jks
+huroofi-upload*
+txt-pass*
 english/www/
 english/android/.gradle/
 english/android/build/
