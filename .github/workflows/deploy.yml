@@ -46,11 +46,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      # ننشر الموقع فقط (لعبة المسابقات وتطبيق حروفي)، دون ملفات أندرويد والاختبارات
+      # ننشر الموقع فقط (صفحة البداية وتطبيقا حروفي)، دون ملفات أندرويد والاختبارات
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp index.html style.css app.js questions.js _site/
+          cp index.html _site/
           cp -r kids _site/kids
           node scripts/build-english.mjs
           cp -r english/www _site/english
