@@ -487,6 +487,10 @@ h3 { margin: 22px 4px 8px; font-size: 18px; }
 }
 .skill-card:active { transform: translateY(4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 55%, #000 10%); }
 .sk-icon { font-size: 44px; line-height: 1.2; }
+/* أيقونة من حروف عربية بدل الإيموجي (انظر G في data.js) */
+.glyph { display: inline-block; padding: 0.05em 0.25em; border-radius: 0.3em; font-family: "Cairo", sans-serif; font-weight: 900; font-size: 0.85em; line-height: 1.25; white-space: nowrap; vertical-align: middle; color: var(--c, var(--ink)); background: color-mix(in srgb, var(--c, var(--orange)) 15%, #fff); }
+.sk-icon .glyph { font-size: 0.6em; padding: 0.12em 0.3em; }
+.num .glyph { font-size: 0.75em; padding: 0; background: none; }
 .skill-card b { font-size: 19px; }
 .skill-card small { font-size: 13px; color: var(--muted); }
 .meter { display: block; width: 100%; height: 10px; border-radius: 999px; background: #eef2f6; overflow: hidden; }

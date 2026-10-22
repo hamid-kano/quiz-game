@@ -2,7 +2,7 @@
 // غيّر رقم الإصدار عند إضافة ملفات جديدة
 // كل تطبيق له بادئة خاصة (العربي والإنجليزي على نفس الموقع)، ولا يحذف إلا نسخه القديمة
 const PREFIX = "huroofi-v";
-const CACHE = PREFIX + "20";
+const CACHE = PREFIX + "21";
 const FILES = [
   "./", "index.html", "manifest.json", "icon.svg",
   "css/style.css", "css/lang.css",

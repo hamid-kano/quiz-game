@@ -161,6 +161,9 @@ export const SENTENCES = [
 //  age: all = للجميع، big = للكبار (6–8) فقط
 //  prefixes: مفاتيح الإتقان التي تُحسب ضمن هذه المهارة، target: عدد العناصر لاعتبارها متقنة 100٪
 // ============================================================
+// أيقونة من حروف عربية: إيموجي الحروف (🔤 🔡) تُرسم بحروف لاتينية على الجوال
+const G = (t) => `<span class="glyph">${t}</span>`;
+
 export const SKILLS = [
   {
     id: "sounds", icon: "👂", name: "الأصوات", color: "#8e7dff",
@@ -175,7 +178,7 @@ export const SKILLS = [
     ]
   },
   {
-    id: "letters", icon: "🔤", name: "الحروف", color: "#fb8500",
+    id: "letters", icon: G("أ ب ت"), name: "الحروف", color: "#fb8500",
     goal: "يتعرّف على أشكال الحروف وأسمائها ويميّز بين المتشابه منها",
     prefixes: ["rec:", "dot:", "frm:"], target: 45,
     activities: [
@@ -184,7 +187,7 @@ export const SKILLS = [
       { id: "letters2", type: "letters", title: "حروف 2", desc: "من الدال إلى الضاد", range: [7, 15], icon: "🌿", age: "all" },
       { id: "letters3", type: "letters", title: "حروف 3", desc: "من الطاء إلى الياء", range: [15, 28], icon: "🌳", age: "all" },
       { id: "similar", type: "similar", title: "حروف متشابهة", desc: "انتبه للنقاط!", icon: "🔍", age: "all" },
-      { id: "forms", type: "forms", title: "أشكال الحرف", desc: "الحرف في أول الكلمة ووسطها وآخرها", icon: "🔤", age: "big" },
+      { id: "forms", type: "forms", title: "أشكال الحرف", desc: "الحرف في أول الكلمة ووسطها وآخرها", icon: G("ـهـ"), age: "big" },
       { id: "memoryForms", type: "memory", mode: "form", title: "ذاكرة الأشكال", desc: "طابق الحرف مع شكله", icon: "🃏", age: "big" }
     ]
   },
@@ -536,7 +539,7 @@ export const SPELL_LESSONS = [
 
 // إضافة قسم التهجئة بعد قسم الحروف
 SKILLS.splice(2, 0, {
-  id: "spelling", icon: "🔡", name: "التهجئة", color: "#6a4c93",
+  id: "spelling", icon: G("بَ بِ"), name: "التهجئة", color: "#6a4c93",
   goal: "يتعلّم طريقة التهجئة خطوة بخطوة: الحركات، المدود، السكون، المقاطع، التنوين، الشدّة، ثم الكلمة كاملة",
   prefixes: ["hs:", "md:", "sk:", "syl:", "tn:", "sh:", "lam:", "tj:", "dict:"], target: 60,
   activities: [
@@ -557,7 +560,7 @@ SKILLS.splice(2, 0, {
 {
   const reading = SKILLS.find((s) => s.id === "reading");
   reading.activities = reading.activities.filter((a) => a.id !== "harakat");
-  reading.activities.unshift({ id: "readVowel", type: "spell", mode: "readVowel", title: "اقرأ المشكول", desc: "اقرأ الكلمة بحركاتها واختر صورتها", icon: "🔤", age: "big" });
+  reading.activities.unshift({ id: "readVowel", type: "spell", mode: "readVowel", title: "اقرأ المشكول", desc: "اقرأ الكلمة بحركاتها واختر صورتها", icon: G("كَتَبَ"), age: "big" });
   reading.prefixes.push("rv:");
   ACTIVITIES.length = 0;
   ACTIVITIES.push(...SKILLS.flatMap((sk) => sk.activities.map((a) => ({ ...a, skill: sk.id }))));

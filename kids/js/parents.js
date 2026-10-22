@@ -140,7 +140,7 @@ function screenReport(back) {
           </div>`).join("")}
       </div>
 
-      <h3>🔤 خريطة الحروف</h3>
+      <h3>${SKILLS.find((s) => s.id === "letters").icon} خريطة الحروف</h3>
       <div class="panel">
         <div class="letter-grid">
           ${statuses.map((s) => `<button class="lg ${s.cls}" data-l="${s.L.l}" title="${s.L.name}: ${s.label}">${s.L.l}</button>`).join("")}
