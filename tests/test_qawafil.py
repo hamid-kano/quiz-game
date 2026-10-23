@@ -82,7 +82,8 @@ async def play_ui(b, width, errs):
             over.append(f"{width}px: never arrived at {to}")
         await pg.locator(".good .b.sell[data-n='max']:not([disabled])").first.click() if await pg.locator(".good .b.sell[data-n='max']:not([disabled])").count() else None
     day = await pg.evaluate("()=>JSON.parse(localStorage.getItem('qawafil-save-v1')).day")
-    if day < 10: over.append(f"{width}px: days did not pass ({day})")
+    # رحلتان من 5 أيام، وقد يختصرهما الدليل الصحراوي يومين
+    if day < 6: over.append(f"{width}px: days did not pass ({day})")
     # المتابعة بعد إعادة التحميل
     await pg.reload(); await pg.wait_for_timeout(300)
     if not await pg.locator("#cont").count(): over.append("no continue button after reload")

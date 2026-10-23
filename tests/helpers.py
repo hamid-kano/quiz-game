@@ -108,11 +108,16 @@ async def new_kid(pg, age, name="تجربة"):
 
 # ---------------- حلول التمارين ----------------
 async def solve_choice(pg):
+    # السؤال قد ينتقل للتالي أثناء الحل (فتختفي الأزرار)، فلا ننتظر زراً لم يعد موجوداً
     n = await pg.locator(".choice").count()
     for i in range(n):
         b = pg.locator(".choice").nth(i)
-        if await b.is_disabled(): continue
-        await b.click(); await pg.wait_for_timeout(60)
+        try:
+            if await b.is_disabled(timeout=2000): continue
+            await b.click(timeout=2000)
+        except Exception:
+            return
+        await pg.wait_for_timeout(60)
         if await pg.locator(".choice.right").count(): return
 async def solve_build(pg):
     while await pg.locator(".slot:not(.filled)").count():
