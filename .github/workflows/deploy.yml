@@ -55,6 +55,7 @@ jobs:
           node scripts/build-english.mjs
           cp -r english/www _site/english
           cp -r qawafil _site/qawafil
+          cp -r saytara _site/saytara
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
