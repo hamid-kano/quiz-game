@@ -1,18 +1,14 @@
-// الحملة: 12 معركة متدرّجة، الخرائط ثابتة للجميع (فيمكن مقارنة الأوقات بين اللاعبين)
-// par: الوقت (بالثواني) للنجمة الثالثة، والنجمة الثانية حتى ضعفه ونصف
+// الحملة: 8 معارك متدرّجة على خرائط ثابتة (يمكن مقارنة الأوقات بين اللاعبين)
+// par: الوقت بالثواني للنجمة الثالثة، والنجمة الثانية حتى ضعفه ونصف
 export const LEVELS = [
-  { title: "الحيّ الأول", seed: 1201, size: "small", ai: ["easy"], par: 90, tutorial: true },
-  { title: "عبور الجسر", seed: 3317, size: "small", ai: ["easy"], par: 95 },
-  { title: "جبهتان", seed: 9907, size: "small", ai: ["easy", "easy"], par: 105 },
-  { title: "المنطقة الصناعية", seed: 5521, size: "medium", ai: ["easy"], par: 110 },
-  { title: "المدينة الكبرى", seed: 18917, size: "large", ai: ["easy", "easy", "easy"], par: 160 },
-  { title: "تحالف الأعداء", seed: 14423, size: "medium", ai: ["normal", "easy"], par: 150 },
-  { title: "قائد متمرّس", seed: 7741, size: "medium", ai: ["normal"], par: 160 },
-  { title: "حصار المقرّ", seed: 23399, size: "medium", ai: ["hard", "normal"], par: 130 },
-  { title: "ثلاثة جيوش", seed: 21143, size: "large", ai: ["normal", "normal"], par: 210 },
-  { title: "معركة المطار", seed: 12011, size: "medium", ai: ["normal"], par: 240 },
-  { title: "القائد الصعب", seed: 35586, size: "medium", ai: ["hard"], par: 200 },
-  { title: "السيطرة الكاملة", seed: 31118, size: "large", ai: ["hard", "normal", "normal"], par: 300 }
+  { title: "التدريب", seed: 1201, ai: "easy", par: 420, tutorial: true, brief: "تعلّم الأساسيات: اشترِ المشاة واحتلّ الساحات" },
+  { title: "عبور النهر", seed: 3317, ai: "easy", par: 420, brief: "الجسور ثلاثة فقط. سيطر عليها قبل العدو" },
+  { title: "المنطقة الصناعية", seed: 5521, ai: "normal", par: 600, brief: "المصانع تضاعف دخلك. احتلّها مبكراً" },
+  { title: "حرب الشوارع", seed: 7741, ai: "normal", par: 600, brief: "العدو يبني مدرّعات: المدفعية تدمّرها من بعيد" },
+  { title: "برج الاتصالات", seed: 9907, ai: "normal", par: 600, brief: "البرج يكشف مساحة واسعة من المدينة" },
+  { title: "القائد الصعب", seed: 12011, ai: "hard", par: 780, brief: "قائد ذكي بموارد أكثر منك. نوّع جيشك" },
+  { title: "الحصار", seed: 14423, ai: "hard", par: 780, brief: "اقطع دخل العدو باحتلال مواقعه قبل مهاجمة مقرّه" },
+  { title: "السيطرة الكاملة", seed: 16661, ai: "hard", par: 840, brief: "المعركة الأخيرة. المدينة لمن يسيطر عليها" }
 ];
 
 export function starsFor(level, won, secs) {

@@ -1,120 +1,124 @@
 // ============================================================
-//  قادة العدو: يقرّرون كل فترة قصيرة أين يهاجمون، ومتى يعزّزون الجبهة، ومتى يدافعون
-//  المستويات تختلف في سرعة القرار، والتنسيق بين الأحياء، والحذر، والأخطاء
+//  قائد العدو: يشتري الوحدات حسب خطة ويغيّرها لمواجهة ما يراه منك،
+//  ويحتلّ المواقع بموجات، ويدافع عن مقرّه ومواقعه، ثم يهاجم مقرّك حين يقوى.
+//  لا يغشّ: يرى فقط ما تراه وحداته (إلا موقع مقرّك فهو معروف للجميع).
 // ============================================================
-import { command, canReach, isAir, typeOf, rateOf, dist, GROUND_SPEED, AIR_SPEED, TICK } from "./sim.js";
-import { makeRng } from "./rng.js";
+import { command, visible, unitCount, MAX_UNITS } from "./world.js";
+import { UNITS } from "./units.js";
+import { POINT_TYPES } from "./city.js";
 
+// income: مضاعف الدخل (القائد الصعب يملك موارد أكثر، والسهل أقل)
 export const LEVELS = {
-  easy: { name: "سهل", think: 32, sources: 1, margin: 1.5, reserve: 0.35, mistakes: 0.25, reinforce: 0.5, defend: false, focus: 0 },
-  normal: { name: "متوسط", think: 18, sources: 2, margin: 1.25, reserve: 0.25, mistakes: 0.08, reinforce: 0.75, defend: true, focus: 0.3 },
-  hard: { name: "صعب", think: 9, sources: 3, margin: 1.12, reserve: 0.18, mistakes: 0, reinforce: 1, defend: true, focus: 0.6 }
+  easy: { name: "سهل", think: 30, wave: 6, mix: { infantry: 0.75, tank: 0.2, artillery: 0, drone: 0.05 }, counter: false, hqAt: 600, army: 1800, defendR: 300, income: 0.8 },
+  normal: { name: "متوسط", think: 16, wave: 5, mix: { infantry: 0.55, tank: 0.25, artillery: 0.1, drone: 0.1 }, counter: true, hqAt: 420, army: 1500, defendR: 420, income: 1 },
+  hard: { name: "صعب", think: 12, wave: 5, mix: { infantry: 0.5, tank: 0.28, artillery: 0.12, drone: 0.1 }, counter: true, hqAt: 450, army: 1800, defendR: 480, income: 1.25 }
 };
-const VALUE = { hq: 3, factory: 2.2, power: 2.2, airport: 1.9, base: 1.6, home: 1 };
+// ما يهزم كل نوع
+const COUNTER = { tank: "artillery", infantry: "tank", artillery: "drone", drone: "infantry" };
+const VALUE = { factory: 3, tower: 2, civic: 2, hq: 0 };
 
-export function createAI(g, p, level = "normal", seed = 1) {
-  return { p, L: LEVELS[level], rng: makeRng(seed * 31 + p * 977), next: 10 + p * 3 };
+export function createAI(w, p, level = "normal") {
+  w.players[p].incomeMul = LEVELS[level].income;
+  return { p, L: LEVELS[level], next: 5, seenEnemy: { infantry: 0, tank: 0, artillery: 0, drone: 0 } };
 }
 
-// الجنود المتجهون إلى حي (لنا أو للعدو)
-function incoming(g, i) {
-  const by = {};
-  for (const s of g.squads) if (s.to === i) by[s.owner] = (by[s.owner] || 0) + s.n;
-  return by;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const centroid = (list) => ({ x: list.reduce((a, u) => a + u.x, 0) / list.length, y: list.reduce((a, u) => a + u.y, 0) / list.length });
+
+export function think(w, ai) {
+  if (w.tick < ai.next || w.over) return;
+  const { p, L } = ai;
+  ai.next = w.tick + L.think;
+  const me = w.players[p], hq = me.hq, foeHq = w.players[1 - p].hq;
+  const mine = w.units.filter((u) => u.p === p);
+  const foes = w.units.filter((u) => u.p !== p && visible(w, p, u.x, u.y));
+  for (const f of foes) ai.seenEnemy[f.type] = ai.seenEnemy[f.type] * 0.9 + 1; // ذاكرة متناقصة
+
+  // ---------- الشراء ----------
+  const mix = { ...L.mix };
+  if (L.counter) {
+    const total = Object.values(ai.seenEnemy).reduce((a, b) => a + b, 0);
+    if (total > 2) for (const [t, n] of Object.entries(ai.seenEnemy)) mix[COUNTER[t]] += (n / total) * 0.5;
+  }
+  if (me.queue.length < 2 && unitCount(w, p) < MAX_UNITS) {
+    const have = {};
+    for (const u of mine) have[u.type] = (have[u.type] || 0) + 1;
+    for (const q of me.queue) have[q.unit] = (have[q.unit] || 0) + 1;
+    const total = Object.values(have).reduce((a, b) => a + b, 0) + 1;
+    const sum = Object.values(mix).reduce((a, b) => a + b, 0);
+    // النوع الأبعد عن نسبته المطلوبة
+    const want = Object.keys(mix).filter((t) => mix[t] > 0)
+      .sort((a, b) => ((have[a] || 0) / total - mix[a] / sum) - ((have[b] || 0) / total - mix[b] / sum))[0];
+    if (me.money >= UNITS[want].cost) command(w, { type: "build", p, unit: want });
+  }
+
+  // ---------- الدفاع ----------
+  const threat = foes.filter((f) => dist(f, hq) < L.defendR);
+  if (threat.length) {
+    const c = centroid(threat);
+    const near = mine.filter((u) => (dist(u, hq) < 700 && u.order !== "move") || dist(u, hq) < 350);
+    if (near.length) command(w, { type: "move", p, ids: near.map((u) => u.id), x: c.x, y: c.y });
+    return;
+  }
+  // موقع لنا يحتلّه العدو
+  for (const pt of w.points) {
+    if (pt.owner !== p || pt.type === "hq") continue;
+    const raid = foes.filter((f) => UNITS[f.type].capture && dist(f, pt) < 110);
+    if (!raid.length) continue;
+    const helpers = mine.filter((u) => u.order === "idle" && dist(u, pt) < 700).slice(0, 5);
+    if (helpers.length) { command(w, { type: "move", p, ids: helpers.map((u) => u.id), x: pt.x, y: pt.y }); return; }
+  }
+
+  // ---------- الهجوم ----------
+  const idle = mine.filter((u) => u.order === "idle");
+  const home = idle.filter((u) => dist(u, hq) < 420);
+  const field = idle.filter((u) => dist(u, hq) >= 420);
+  const owned = w.points.filter((x) => x.owner === p && x.type !== "hq").length;
+  const capturable = w.points.filter((x) => x.type !== "hq" && x.owner !== p);
+  const secs = w.tick / 10;
+  const armyValue = mine.reduce((a, u) => a + UNITS[u.type].cost * (u.hp / UNITS[u.type].hp), 0);
+  const theirs = w.points.filter((x) => x.owner === 1 - p && x.type !== "hq").length;
+  // نهاجم المقرّ حين نسيطر على المدينة، أو حين يكبر جيشنا بعد وقت كافٍ
+  const goHq = capturable.length === 0 || (owned >= theirs + 3 && armyValue > L.army * 0.7) || (secs > L.hqAt && armyValue > L.army) || secs > L.hqAt * 2;
+  const pickTarget = (from) => {
+    if (goHq) return { x: foeHq.x, y: foeHq.y };
+    let best = null, bs = -1;
+    for (const pt of capturable) {
+      const s = (VALUE[pt.type] + (pt.owner === -1 ? 1 : 0.4)) / (dist(from, pt) + 400);
+      if (s > bs) { bs = s; best = pt; }
+    }
+    return best;
+  };
+  // وحدات في الميدان أنهت مهمتها: تتابع إلى الهدف التالي إن كانت قوية، وإلا تعود
+  if (field.length) {
+    const groups = [];
+    for (const u of field) {
+      let g = groups.find((x) => dist(x.c, u) < 220);
+      if (!g) groups.push((g = { c: { x: u.x, y: u.y }, list: [] }));
+      g.list.push(u);
+    }
+    for (const g of groups) {
+      // ما زال هناك موقع يُحتل هنا: نبقى
+      const here = w.points.find((pt) => pt.type !== "hq" && pt.owner !== p && dist(pt, g.c) < 120);
+      if (here && g.list.some((u) => UNITS[u.type].capture)) continue;
+      const strong = g.list.length >= Math.ceil(L.wave * 0.6) && g.list.some((u) => UNITS[u.type].capture);
+      const t = strong ? pickTarget(g.c) : hq;
+      if (t) command(w, { type: "move", p, ids: g.list.map((u) => u.id), x: t.x, y: t.y });
+    }
+  }
+  const ground = home.filter((u) => !UNITS[u.type].air);
+  if (ground.length >= L.wave && ground.filter((u) => UNITS[u.type].capture).length >= 2) {
+    const t = pickTarget(hq);
+    if (t) command(w, { type: "move", p, ids: home.map((u) => u.id), x: t.x, y: t.y });
+  } else {
+    // المسيّرات تستطلع أمام المقر
+    const drones = home.filter((u) => u.type === "drone");
+    if (drones.length) {
+      const t = pickTarget(hq) || foeHq;
+      command(w, { type: "move", p, ids: drones.map((u) => u.id), x: (t.x + hq.x) / 2, y: (t.y + hq.y) / 2 });
+    }
+  }
 }
 
-export function think(g, ai) {
-  if (g.tick < ai.next || !g.players[ai.p].alive || g.over) return;
-  const { L, p, rng } = ai;
-  ai.next = g.tick + L.think + Math.floor(rng() * L.think * 0.5);
-  const D = g.map.districts;
-  const mine = g.d.map((x, i) => i).filter((i) => g.d[i].owner === p);
-  if (!mine.length) return;
-  const border = (i) => D[i].nb.some((j) => g.d[j].owner !== p);
-  // مع مرور الوقت يصبح القائد أجرأ (حتى لا تتجمّد المعركة)
-  const late = Math.min(1, g.tick / (10 * 240));
-  const margin = L.margin - (L.margin - 1.02) * late * 0.8;
-  const reserve = L.reserve * (1 - late * 0.6);
-  const full = (i) => g.d[i].troops >= typeOf(g, i).cap * 0.85;
-
-  // 1) الدفاع: حيّ مهدّد بهجوم قادم
-  if (L.defend) {
-    for (const i of mine) {
-      const inc = incoming(g, i);
-      const enemy = Object.entries(inc).filter(([o]) => +o !== p).reduce((a, [, n]) => a + n, 0);
-      const ours = (inc[p] || 0) + g.d[i].troops * typeOf(g, i).def;
-      if (enemy > ours * 0.9) {
-        const helpers = D[i].nb.filter((j) => g.d[j].owner === p && g.d[j].troops > 8 && j !== i);
-        for (const h of helpers.slice(0, L.sources)) command(g, { type: "send", p, from: h, to: i, n: Math.ceil(Math.min(g.d[h].troops * 0.6, enemy - ours + 6)) });
-        if (helpers.length) return;
-      }
-    }
-  }
-
-  // 2) الهجوم: أفضل هدف بالنسبة بين قيمته وكلفته
-  const weakest = g.players.filter((x) => x.alive && x.id !== p).map((x) => x.id)
-    .sort((a, b) => g.d.filter((d) => d.owner === a).length - g.d.filter((d) => d.owner === b).length)[0];
-  let best = null;
-  const targets = new Set();
-  for (const i of mine) for (let j = 0; j < D.length; j++) if (g.d[j].owner !== p && canReach(g, i, j)) targets.add(j);
-  for (const t of targets) {
-    const tx = g.d[t];
-    const srcs = mine.filter((i) => canReach(g, i, t) && g.d[i].troops >= 4)
-      .sort((a, b) => g.d[b].troops - g.d[a].troops).slice(0, L.sources);
-    if (!srcs.length) continue;
-    const far = Math.max(...srcs.map((s) => dist(g, s, t) / (isAir(g, s, t) ? AIR_SPEED : GROUND_SPEED)));
-    const inc = incoming(g, t);
-    const growth = tx.owner >= 0 ? rateOf(g, t) * far : 0;
-    const need = (tx.troops + growth) * typeOf(g, t).def * margin + 3 - (inc[p] || 0);
-    const avail = srcs.reduce((a, s) => a + g.d[s].troops * (border(s) && !full(s) ? 1 - reserve : 0.9), 0);
-    // حصار: إذا امتلأت أحياؤنا فالأفضل استنزاف العدو بدل هدر الجنود
-    const siege = avail < need && tx.owner >= 0 && srcs.some(full) && avail > need * 0.5;
-    if (avail < need && !siege) continue;
-    let score = (VALUE[D[t].type] + (tx.owner >= 0 ? 0.6 : 0)) / (need + 6) * (siege ? 0.5 : 1);
-    if (tx.owner === weakest) score *= 1 + L.focus;
-    if (tx.owner === -1 && D[t].type === "home") score *= 1.1;
-    score /= 1 + far / 30;
-    if (!best || score > best.score) best = { t, srcs, need: siege ? avail : need, score };
-  }
-  if (best && rng() < L.mistakes) {
-    // خطأ بشري: هجوم متسرّع على هدف عشوائي
-    const t = [...targets][Math.floor(rng() * targets.size)];
-    const s = mine.filter((i) => canReach(g, i, t)).sort((a, b) => g.d[b].troops - g.d[a].troops)[0];
-    if (s != null) { command(g, { type: "send", p, from: s, to: t, pct: 0.6 }); return; }
-  }
-  if (best) {
-    let left = best.need;
-    for (const s of best.srcs) {
-      if (left <= 0) break;
-      const can = Math.floor(g.d[s].troops * (border(s) && !full(s) ? 1 - reserve : 0.9));
-      const k = Math.min(can, Math.ceil(left) + 2);
-      if (k >= 1) { command(g, { type: "send", p, from: s, to: best.t, n: k }); left -= k; }
-    }
-  }
-
-  // 3) التعزيز: الأحياء الداخلية ترسل جنودها نحو الجبهة
-  if (rng() < L.reinforce) {
-    const front = mine.filter(border);
-    if (!front.length) return;
-    // المسافة (بالخطوات) من كل حي إلى أقرب جبهة
-    const hop = Object.fromEntries(front.map((i) => [i, 0]));
-    const q = [...front];
-    while (q.length) {
-      const u = q.shift();
-      for (const v of D[u].nb) if (g.d[v].owner === p && hop[v] === undefined) { hop[v] = hop[u] + 1; q.push(v); }
-    }
-    // الأحياء الممتلئة أولاً (جنودها الزائدة تضيع إن بقيت)
-    let moves = 0;
-    const interior = mine.filter((i) => !border(i) && hop[i] !== undefined && g.d[i].troops >= 14)
-      .sort((a, b) => g.d[b].troops / typeOf(g, b).cap - g.d[a].troops / typeOf(g, a).cap);
-    for (const i of interior) {
-      if (moves >= L.sources) break;
-      const toward = D[i].nb.filter((j) => g.d[j].owner === p && hop[j] === hop[i] - 1)
-        .sort((a, b) => g.d[a].troops - g.d[b].troops)[0];
-      if (toward != null) { command(g, { type: "send", p, from: i, to: toward, pct: 0.8 }); moves++; }
-    }
-  }
-}
-
-export const thinkAll = (g, ais) => ais.forEach((a) => think(g, a));
-export const AI_TICK_SECONDS = TICK;
+export const thinkAll = (w, ais) => ais.forEach((a) => think(w, a));
+export { POINT_TYPES };
