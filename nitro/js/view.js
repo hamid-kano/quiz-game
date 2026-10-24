@@ -276,8 +276,8 @@ export function createRaceView(renderer, assets, track, race, opts) {
     const cv = makeCar(assets, c.vid);
     scene.add(cv.root);
     if (c.id !== race.player) {
-      cv.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(String(c.place), COLORS[c.id % COLORS.length]), depthTest: false, transparent: true }));
-      cv.tag.scale.set(0.9, 0.9, 1); cv.tag.renderOrder = 10; cv.tagPlace = c.place;
+      cv.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(String(c.place), COLORS[c.id % COLORS.length]), depthTest: false, transparent: true, sizeAttenuation: false }));
+      cv.tag.scale.set(0.045, 0.045, 1); cv.tag.renderOrder = 10; cv.tagPlace = c.place;
       scene.add(cv.tag);
     }
     if (th.lights) {
@@ -337,6 +337,8 @@ export function createRaceView(renderer, assets, track, race, opts) {
       if (c.nitroOn) cv.flames.children.forEach((f, i) => { const b = i % 2 ? 0.5 : 1.1; const k = 0.75 + Math.random() * 0.5; f.scale.set(b * k, b * k, 1); });
       if (cv.tag) {
         cv.tag.position.set(x, c.y + 2.3, z);
+        // لا تظهر العلامة للسيارات الملاصقة للكاميرا (تغطي الشاشة)
+        cv.tag.visible = Math.hypot(x - camera.position.x, z - camera.position.z) > 7;
         if (cv.tagPlace !== c.place) { cv.tagPlace = c.place; cv.tag.material.map.dispose(); cv.tag.material.map = labelTexture(String(c.place), COLORS[c.id % COLORS.length]); }
       }
       // دخان وآثار الإطارات
