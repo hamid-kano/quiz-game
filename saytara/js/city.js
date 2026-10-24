@@ -14,10 +14,8 @@ export const riverY = (x) => H / 2 + RIVER_A * Math.sin((2 * Math.PI * (x - W / 
 export const STREET = 13, AVENUE = 22; // نصف عرض الشارع والجادّة
 
 export const POINT_TYPES = {
-  civic: { name: "حي سكني", icon: "🏘️", income: 2, vision: 160 },
-  factory: { name: "مصنع", icon: "🏭", income: 4, vision: 160 },
-  tower: { name: "برج اتصالات", icon: "📡", income: 1, vision: 420 },
-  hq: { name: "المقرّ", icon: "🏛️", income: 0, vision: 300 }
+  refinery: { name: "مصفاة نفط", icon: "🛢️", income: 6, vision: 170 },
+  tower: { name: "برج اتصالات", icon: "📡", income: 2, vision: 420 }
 };
 
 const rot = (p) => ({ x: W - p.x, y: H - p.y });
@@ -97,46 +95,59 @@ export function generateCity(seed, attempt = 0) {
     if (b.r === R - 2) return x < 0.5 ? "riverside" : "dense";
     return x < 0.13 ? "park" : x < 0.24 ? "industrial" : "dense";
   });
-  // ---------- المواقع: المقرّ + مواقع السيطرة (في النصف العلوي ثم نسختها) ----------
+  // ---------- القاعدة والمواقع (في النصف العلوي ثم نسختها المدوّرة) ----------
+  // hq: أرض المقرّ · lot: أرض فارغة للبناء · depot: مستودع مؤن · refinery/tower: مواقع يحتلّها المشاة
   const pick = new Map();
-  const hqCol = 3 + Math.floor(rng() * 2); // عمود المقرّ (3 أو 4) قرب الوسط
+  const hqCol = 3 + Math.floor(rng() * 2);
   pick.set(`0-${hqCol}`, "hq");
-  const cand = topBlocks.filter((b) => !(b.r === 0 && Math.abs(b.c - hqCol) <= 1)).sort(() => rng() - 0.5);
-  const wanted = ["factory", "factory", "tower", "civic", "civic", "civic"];
-  const chosen = [];
-  for (const b of cand) {
-    if (chosen.length >= wanted.length) break;
-    // متباعدة عن بعضها وعن المقرّ
-    if (chosen.some((o) => Math.abs(o.r - b.r) + Math.abs(o.c - b.c) < 3)) continue;
-    if (b.r <= 1 && Math.abs(b.c - hqCol) <= 2) continue;
-    chosen.push(b);
+  const key = (b) => `${b.r}-${b.c}`;
+  const free = (b) => !pick.has(key(b));
+  // أراضي القاعدة: الأقرب إلى المقرّ
+  topBlocks.filter((b) => b.r <= 2 && Math.abs(b.c - hqCol) <= 2 && free(b))
+    .sort((a, b) => Math.hypot(a.r, a.c - hqCol) - Math.hypot(b.r, b.c - hqCol))
+    .slice(0, 9).forEach((b) => pick.set(key(b), "lot"));
+  // مستودعان على جانبي القاعدة
+  for (const c of [Math.max(0, hqCol - 3), Math.min(C - 2, hqCol + 3)]) {
+    const b = topBlocks.find((x) => x.r === 1 && x.c === c && free(x)) || topBlocks.find((x) => x.r === 2 && x.c === c && free(x));
+    if (b) pick.set(key(b), "depot");
   }
-  // المصانع أقرب للنهر (موارد يتنافس عليها الطرفان)، والبرج في الوسط
-  chosen.sort((a, b) => b.r - a.r);
-  chosen.forEach((b, k) => pick.set(`${b.r}-${b.c}`, wanted[k]));
+  // وسط الخريطة: مستودع، مصفاتان، برج، وأرضان للتوسّع (متباعدة)
+  const midWanted = ["depot", "refinery", "refinery", "tower", "lot", "lot"];
+  const mid = topBlocks.filter((b) => b.r >= 3 && free(b)).sort(() => rng() - 0.5);
+  const chosen = [];
+  for (const want of midWanted) {
+    const b = mid.find((x) => free(x) && !chosen.some((o) => Math.abs(o.r - x.r) + Math.abs(o.c - x.c) < 2) &&
+      (want !== "depot" || x.r === R - 2) && (want !== "tower" || x.r === 3));
+    if (b) { chosen.push(b); pick.set(key(b), want); }
+  }
 
-  const blocks = [];
-  const points = [];
+  const blocks = [], points = [], lots = [], depots = [], pads = [];
+  const entryOf = (q, cx, cy) => q.reduce((best, i) => (Math.hypot(nodes[i].x - cx, nodes[i].y - cy) < Math.hypot(nodes[best].x - cx, nodes[best].y - cy) ? i : best), q[0]);
   for (const h of [0, 1]) topBlocks.forEach((b, k) => {
     const q = h ? b.q.map((i) => i + N) : b.q;
     const poly = makePoly(q);
     const cx = poly.reduce((a, p) => a + p.x, 0) / 4, cy = poly.reduce((a, p) => a + p.y, 0) / 4;
-    const pt = pick.get(`${b.r}-${b.c}`);
-    const block = { poly, x: cx, y: cy, kind: pt ? (pt === "hq" ? "hq" : "plaza") : kinds[k], half: h, seed: seed * 7 + k, q };
+    const pt = pick.get(key(b));
+    const kind = pt ? (pt === "refinery" || pt === "tower" ? "plaza" : pt) : kinds[k];
+    const block = { poly, x: cx, y: cy, kind, half: h, seed: seed * 7 + k, q, open: !!pt };
     blocks.push(block);
-    if (pt) {
-      // أقرب تقاطع للموقع (منه يدخل الجنود)
-      const entry = q.reduce((best, i) => (Math.hypot(nodes[i].x - cx, nodes[i].y - cy) < Math.hypot(nodes[best].x - cx, nodes[best].y - cy) ? i : best), q[0]);
-      points.push({ id: points.length, type: pt, x: cx, y: cy, entry, block: blocks.length - 1, owner: pt === "hq" ? (h ? 0 : 1) : -1 });
+    const entry = entryOf(q, cx, cy);
+    if (pt === "refinery" || pt === "tower") points.push({ id: points.length, type: pt, x: cx, y: cy, entry, block: blocks.length - 1, owner: -1 });
+    if (pt === "depot") depots.push({ id: depots.length, x: cx, y: cy, entry, block: blocks.length - 1, half: h, base: b.r < 3 });
+    if (pt === "lot" || pt === "hq") {
+      const lot = { id: lots.length, x: cx, y: cy, entry, block: blocks.length - 1, half: h, base: b.r < 3, hq: pt === "hq" ? (h ? 0 : 1) : -1, poly, pads: [] };
+      lots.push(lot);
+      // زوايا الأرض: أماكن صغيرة للدفاعات
+      for (const v of poly) {
+        const d = Math.hypot(cx - v.x, cy - v.y);
+        const pad = { id: pads.length, x: v.x + ((cx - v.x) * 24) / d, y: v.y + ((cy - v.y) * 24) / d, lot: lot.id, entry };
+        pads.push(pad); lot.pads.push(pad.id);
+      }
     }
   });
-  // الأبنية داخل كل كتلة (مبذورة بكتلتها: النصف السفلي يأخذ نفس الأبنية مدوّرة)
   for (const b of blocks) b.buildings = makeBuildings(b, makeRng(b.seed));
-  // نادراً ما تنعزل تقاطعات بسبب الشوارع المحذوفة: نعيد التوليد بمحاولة أخرى
-  const seen = new Set([0]), bfs = [0];
-  while (bfs.length) { const u = bfs.shift(); for (const { to } of adj[u]) if (!seen.has(to)) { seen.add(to); bfs.push(to); } }
-  if (seen.size !== nodes.length && attempt < 20) return generateCity(seed, attempt + 1);
-  return { seed, W, H, nodes, edges, adj, bridges, blocks, points, hq: [points.find((p) => p.type === "hq" && p.owner === 0), points.find((p) => p.type === "hq" && p.owner === 1)] };
+  const hqLots = [lots.find((l) => l.hq === 0), lots.find((l) => l.hq === 1)];
+  return { seed, W, H, nodes, edges, adj, bridges, blocks, points, lots, depots, pads, hqLots, hq: hqLots.map((l) => ({ x: l.x, y: l.y })) };
 }
 
 // نقطة داخل الكتلة بالإحداثيين (u,v) من 0 إلى 1
@@ -154,7 +165,13 @@ function makeBuildings(b, rng) {
     for (let k = 0; k < 22; k++) out.trees.push({ ...bilerp(P, 0.08 + rng() * 0.84, 0.08 + rng() * 0.84), r: 9 + rng() * 9 });
     return out;
   }
-  if (b.kind === "plaza" || b.kind === "hq") {
+  if (b.kind === "lot" || b.kind === "hq") return out;            // أرض فارغة: تُرسم بنفسها
+  if (b.kind === "depot") {
+    // أكوام صناديق المؤن
+    for (let k = 0; k < 9; k++) out.crates = (out.crates || []).concat([{ ...bilerp(P, 0.25 + (k % 3) * 0.25, 0.25 + Math.floor(k / 3) * 0.25), s: 13 + rng() * 6, a: rng() * 0.5 }]);
+    return out;
+  }
+  if (b.kind === "plaza") {
     // أبنية على الأطراف وساحة في الوسط
     for (const [u0, u1, v0, v1] of [[0.04, 0.3, 0.04, 0.26], [0.7, 0.96, 0.04, 0.26], [0.04, 0.3, 0.74, 0.96], [0.7, 0.96, 0.74, 0.96]])
       out.list.push({ poly: quad(P, u0, u1, v0, v1), h: 10 + rng() * 14, roof: ROOFS[Math.floor(rng() * ROOFS.length)] });
@@ -194,10 +211,19 @@ export function nearestOnRoad(city, x, y) {
   return best;
 }
 
-// الموقع (الساحة) الذي يقع فيه هذا المكان، إن وُجد
-export function pointAt(city, x, y) {
-  return city.points.find((p) => Math.hypot(p.x - x, p.y - y) < 70) || null;
+// الكتلة المفتوحة (أرض، مستودع، ساحة) التي يقع فيها هذا المكان: الوحدات تمشي إليه مباشرة
+export function openBlockAt(city, x, y) {
+  for (const b of city.blocks) if (b.open && inPoly(b.poly, x, y)) return b;
+  return null;
 }
+export const inPoly = (poly, x, y) => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+};
 
 // أقصر مسار بين موضعين على الشبكة (A*)، يعيد نقاط الطريق
 export function findPath(city, from, to) {

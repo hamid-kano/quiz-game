@@ -1,7 +1,7 @@
 // يحفظ ملفات اللعبة لتعمل بدون إنترنت (الشبكة أولاً ثم النسخة المحفوظة)
 const PREFIX = "saytara-v";
-const CACHE = PREFIX + "2";
-const FILES = ["./", "index.html", "manifest.json", "css/style.css", "js/main.js", "js/city.js", "js/world.js", "js/units.js", "js/ai.js", "js/draw.js", "js/levels.js", "js/rng.js",
+const CACHE = PREFIX + "3";
+const FILES = ["./", "index.html", "manifest.json", "css/style.css", "js/main.js", "js/city.js", "js/world.js", "js/rules.js", "js/ai.js", "js/draw.js", "js/levels.js", "js/rng.js",
   "fonts/cairo-arabic-400-normal.woff2", "fonts/cairo-arabic-700-normal.woff2", "fonts/cairo-arabic-900-normal.woff2",
   "fonts/cairo-latin-400-normal.woff2", "fonts/cairo-latin-700-normal.woff2", "fonts/cairo-latin-900-normal.woff2",
   "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"];
