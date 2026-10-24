@@ -3,14 +3,14 @@ name: Build Android app
 on:
   push:
     branches: [main]
-    paths: ["kids/**", "android/**", "english/**", "scripts/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
+    paths: ["kids/**", "android/**", "english/**", "nitro/**", "nitro-app/**", "scripts/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 permissions:
   contents: write   # لنشر ملف APK في صفحة الإصدارات
 
 jobs:
-  # تطبيقان من نفس المحرّك: حروفي (العربية) وحروفي English
+  # حروفي (العربية) وحروفي English من نفس المحرّك، ولعبة نيترو
   android:
     strategy:
       fail-fast: false
@@ -28,6 +28,12 @@ jobs:
             tag: android-english-latest
             title: حروفي English
             font: fonts/andika-latin-400-normal.woff2
+          - app: nitro
+            dir: nitro-app
+            name: nitro
+            tag: android-nitro-latest
+            title: نيترو
+            check: index.html privacy.html js/main.js js/view.js js/sim.js lib/three.module.min.js lib/three.core.min.js models/vehicle-truck-red.glb models/Textures/colormap.png audio/engine.wav css/style.css
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -53,6 +59,7 @@ jobs:
         run: |
           npm ci
           if [ "${{ matrix.app }}" = "english" ]; then node scripts/build-english.mjs; fi
+          if [ "${{ matrix.app }}" = "nitro" ]; then node scripts/build-nitro.mjs; fi
           cd "${{ matrix.dir }}" && "$GITHUB_WORKSPACE/node_modules/.bin/cap" sync android
 
       - name: Build test APK (debug)
@@ -76,7 +83,9 @@ jobs:
           SIZE=$(du -h "$APK" | cut -f1)
           echo "::notice title=APK::$PKG | $SDK | $LABEL | size $SIZE | web files $FILES | permissions: $PERMS"
           MISSING=""
-          for f in index.html privacy.html js/main.js js/native.js js/lang.js vendor/capacitor.js ${{ matrix.font }} css/style.css; do
+          CHECK="${{ matrix.check }}"
+          if [ -z "$CHECK" ]; then CHECK="index.html privacy.html js/main.js js/native.js js/lang.js vendor/capacitor.js ${{ matrix.font }} css/style.css"; fi
+          for f in $CHECK; do
             unzip -l "$APK" | grep -q "assets/public/$f" || MISSING="$MISSING $f"
           done
           if [ -n "$MISSING" ]; then echo "::error title=APK::missing files:$MISSING"; exit 1; fi

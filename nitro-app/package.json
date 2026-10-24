@@ -1,0 +1,17 @@
+{
+  "name": "nitro-racing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "نيترو: لعبة سباق سيارات ثلاثية الأبعاد (ملفات اللعبة في ../nitro، والمكتبات من المجلد الرئيسي)",
+  "scripts": {
+    "build": "node ../scripts/build-nitro.mjs",
+    "sync": "node ../scripts/build-nitro.mjs && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

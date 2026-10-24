@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">نيترو</string>
+    <string name="title_activity_main">نيترو</string>
+    <string name="package_name">app.hamidkano.nitro</string>
+    <string name="custom_url_scheme">app.hamidkano.nitro</string>
+</resources>

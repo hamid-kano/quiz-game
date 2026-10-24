@@ -19,3 +19,11 @@ english/android/app/src/main/assets/public/
 english/android/app/src/main/assets/capacitor.config.json
 english/android/app/src/main/assets/capacitor.plugins.json
 __pycache__/
+nitro-app/www/
+nitro-app/android/.gradle/
+nitro-app/android/build/
+nitro-app/android/app/build/
+nitro-app/android/local.properties
+nitro-app/android/app/src/main/assets/public/
+nitro-app/android/app/src/main/assets/capacitor.config.json
+nitro-app/android/app/src/main/assets/capacitor.plugins.json

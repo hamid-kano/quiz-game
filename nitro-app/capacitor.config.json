@@ -1,0 +1,10 @@
+{
+  "appId": "app.hamidkano.nitro",
+  "appName": "نيترو",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#14102b",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

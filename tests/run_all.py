@@ -6,7 +6,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from helpers import start_server, APP
 
-TESTS = ["test_content.py", "test_native.py", "test_layout.py", "test_speech.py", "test_writing_check.py", "test_activities.py", "test_qawafil.py", "test_saytara.py"]
+TESTS = ["test_content.py", "test_native.py", "test_layout.py", "test_speech.py", "test_writing_check.py", "test_activities.py", "test_qawafil.py", "test_saytara.py", "test_nitro.py"]
 only = sys.argv[1:]
 server = start_server()
 failed = []
