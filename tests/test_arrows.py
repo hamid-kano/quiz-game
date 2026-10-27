@@ -31,12 +31,15 @@ ENGINE = """async () => {
   if (fillSum / 300 < 0.85) problems.push('boards too empty: ' + (fillSum / 300).toFixed(2));
   for (const d of ['2026-10-27', '2026-12-31', '2027-02-28']) check(G.dailySpec(d), G.generate(G.dailySpec(d)));
   // المسارات الأصعب: قابلة للحل، وأصعب فعلاً (سلسلة اعتماد أعمق من العادي)
-  const depth = { normal: 0, hard: 0, expert: 0 };
-  for (const d of ['normal', 'hard', 'expert']) for (let n = 1; n <= 40; n++) {
+  const depth = { normal: 0, hard: 0, expert: 0, legend: 0 };
+  for (const d of ['normal', 'hard', 'expert', 'legend']) for (let n = 1; n <= 40; n++) {
     const sp = G.levelSpec(n, d), L = G.generate(sp), r = check(sp, L);
     depth[d] += r.depth || 0;
   }
-  if (!(depth.hard > depth.normal * 1.2 && depth.expert >= depth.hard)) problems.push('difficulty not increasing: ' + JSON.stringify(depth));
+  if (!(depth.hard > depth.normal * 1.2 && depth.expert >= depth.hard && depth.legend >= depth.expert)) problems.push('difficulty not increasing: ' + JSON.stringify(depth));
+  let early = 0, late = 0;
+  for (let n = 1; n <= 8; n++) { early += G.solve(G.generate(G.levelSpec(n + 20, 'expert'))).depth; late += G.solve(G.generate(G.levelSpec(n + 100, 'expert'))).depth; }
+  if (late <= early) problems.push(`late levels not harder (${early} vs ${late})`);
   if (G.generate(G.levelSpec(7, 'hard')).arrows.length === G.generate(G.levelSpec(7, 'normal')).arrows.length && JSON.stringify(G.generate(G.levelSpec(7, 'hard')).arrows) === JSON.stringify(G.generate(G.levelSpec(7, 'normal')).arrows)) problems.push('hard track same as normal');
   if (JSON.stringify(G.generate(G.levelSpec(42)).arrows) !== JSON.stringify(G.generate(G.levelSpec(42)).arrows)) problems.push('level not deterministic');
   return [...new Set(problems)].slice(0, 12);
@@ -102,7 +105,7 @@ async def play(b, w, h, errs):
     if hid is None or hid not in await ev("()=>__mz.free()"): out.append(f"{tag}: hint did not point to a free arrow")
     if await ev("()=>__mz.P.hints") != h0 - 1: out.append(f"{tag}: hint count not reduced")
     # لوحة كبيرة: التقريب بالعجلة والسحب ثم الملاءمة
-    await ev("()=>__mz.startLevel(80)"); await pg.wait_for_timeout(400); await check("big board")
+    await ev("()=>__mz.startLevel(80)"); await pg.wait_for_function("()=>__mz.G && __mz.G.spec.n===80", timeout=15000); await pg.wait_for_timeout(200); await check("big board")
     s0 = await ev("()=>__mz.G.E.view.s")
     box = await pg.locator("#cv").bounding_box()
     await pg.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
@@ -117,7 +120,7 @@ async def play(b, w, h, errs):
     # مسار الخبير: قلبان، وتقدّم مستقل
     await ev("()=>__mz.home()"); await pg.wait_for_timeout(200)
     await pg.click(".diffs [data-d='expert']"); await pg.wait_for_timeout(200); await check("home expert")
-    await pg.click("#play"); await pg.wait_for_timeout(500)
+    await pg.click("#play"); await pg.wait_for_function("()=>__mz.G && __mz.G.spec.diff==='expert'", timeout=15000); await pg.wait_for_timeout(200)
     if await ev("()=>__mz.G.spec.diff") != "expert" or await pg.locator("#hearts i").count() != 2: out.append(f"{tag}: expert track not applied")
     if await ev("()=>__mz.P.level") != 1: out.append(f"{tag}: expert progress not separate")
     for _ in range(80):
@@ -134,6 +137,9 @@ async def play(b, w, h, errs):
     await ev("()=>{__mz.P.settings.size='s'; __mz.G.E.fit()}")
     s_s = await ev("()=>__mz.G.E.view.s")
     if not s_s < s_m: out.append(f"{tag}: arrow size setting has no effect ({s_m} -> {s_s})")
+    await ev("()=>{__mz.P.settings.gap='wide'; __mz.G.E.fit()}")
+    if not await ev("()=>__mz.G.E.view.s") > s_s: out.append(f"{tag}: spacing setting has no effect")
+    await ev("()=>{__mz.P.settings.gap='normal'}")
     await ev("()=>{__mz.P.settings.size='m'}")
     # التحدّي اليومي، المستويات، الإعدادات
     await ev("()=>__mz.startDaily()"); await pg.wait_for_timeout(300); await check("daily")
@@ -142,6 +148,8 @@ async def play(b, w, h, errs):
     await pg.click("#back"); await pg.wait_for_timeout(200)
     await pg.click("#settings"); await pg.wait_for_timeout(150); await check("settings")
     await pg.click("#s_size [data-z='l']"); await pg.wait_for_timeout(100)
+    await pg.click("#s_gap [data-g='wide']"); await pg.wait_for_timeout(100)
+    if await ev("()=>__mz.P.settings.gap") != "wide": out.append(f"{tag}: spacing setting not saved")
     if await ev("()=>__mz.P.settings.size") != "l": out.append(f"{tag}: size setting not saved")
     await pg.click(".themes [data-t='night']"); await pg.wait_for_timeout(100)
     if await ev("()=>document.documentElement.dataset.ui") != "dark": out.append(f"{tag}: theme did not apply")

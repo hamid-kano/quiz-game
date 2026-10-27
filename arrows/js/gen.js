@@ -34,21 +34,24 @@ const SHAPE_CYCLE = ["circle", "diamond", "heart", "plus", "ring", "hourglass", 
 export const DIFFS = {
   normal: { name: "عادي", icon: "😊", hearts: 3 },
   hard: { name: "صعب", icon: "🔥", hearts: 3 },
-  expert: { name: "خبير", icon: "💀", hearts: 2 }
+  expert: { name: "خبير", icon: "💀", hearts: 2 },
+  legend: { name: "أسطوري", icon: "🧠", hearts: 1 }
 };
 export function levelSpec(n, diff = "normal") {
-  const D = { normal: { start: 4, step: 5, cap: 18, len: 0, turn: 0, lock: 0, k: 1 }, hard: { start: 8, step: 4, cap: 18, len: 3, turn: 0.1, lock: 1.2, k: 6, deep: 3 }, expert: { start: 10, step: 3, cap: 20, len: 5, turn: 0.16, lock: 2.2, k: 10, deep: 6 } }[diff] || {};
+  const D = { normal: { start: 4, step: 5, cap: 18, len: 0, turn: 0, lock: 0, k: 1 }, hard: { start: 8, step: 4, cap: 18, len: 3, turn: 0.1, lock: 1.2, k: 6, deep: 3 }, expert: { start: 10, step: 3, cap: 20, len: 5, turn: 0.16, lock: 2.2, k: 10, deep: 6 }, legend: { start: 12, step: 3, cap: 20, len: 7, turn: 0.22, lock: 3.5, k: 14, deep: 9, pow: 3 } }[diff] || {};
+  // كل 20 مستوى «مرحلة» أصعب من التي قبلها، فالمستويات الأخيرة هي الأصعب في كل مسار
+  const tier = Math.min(5, Math.floor((n - 1) / 20));
   const size = Math.min(D.cap, D.start + Math.floor((n - 1) / D.step));
   let shape = "square", w = size, h = size;
   if (n >= (diff === "normal" ? 12 : 4) && n % 5 === 0) { shape = SHAPE_CYCLE[Math.floor(n / 5) % SHAPE_CYCLE.length]; w = h = Math.min(D.cap + 2, size + 2); }
   else if (n >= 8 && n % 7 === 3) { h = Math.min(D.cap + 2, size + 3); } // لوحات مستطيلة طولية تناسب الجوال
-  const seed = 7919 * n + 104729 + { normal: 0, hard: 1000003, expert: 2000006 }[diff];
+  const seed = 7919 * n + 104729 + { normal: 0, hard: 1000003, expert: 2000006, legend: 3000009 }[diff];
   return {
     n, diff, seed, w, h, shape,
-    maxLen: 3 + Math.floor(Math.max(w, h) / 2.2) + D.len,
-    turn: Math.min(0.62, 0.18 + n * 0.006 + D.turn),
-    lock: Math.min(2.5 + D.lock * 1.5, 0.3 + n * 0.04 + D.lock),
-    tries: D.k, deep: D.deep || 0
+    maxLen: 3 + Math.floor(Math.max(w, h) / 2.2) + D.len + tier,
+    turn: Math.min(0.66, 0.18 + n * 0.006 + D.turn),
+    lock: Math.min(2.5 + D.lock * 1.5, 0.3 + n * 0.04 + D.lock) + tier * 0.4,
+    tries: D.k + tier * 2, deep: (D.deep || 0) + tier * (diff === "normal" ? 0.6 : 1.2), pow: D.pow || 2, tier
   };
 }
 export function dailySpec(dateStr) {
@@ -104,17 +107,27 @@ function build(spec, R) {
   while (fails < 60) {
     // كل الرؤوس الممكنة: خلية فارغة واتجاه طريقه فارغ حتى الحافة
     const cands = [];
+    // clear[d][k]: هل الطريق من الخلية k في الاتجاه d فارغ حتى الحافة (حساب سريع بمسح واحد لكل اتجاه)
+    const clear = [0, 1, 2, 3].map(() => new Uint8Array(w * h));
+    for (let y = 0; y < h; y++) {
+      let ok = 1; for (let x = w - 1; x >= 0; x--) { clear[0][y * w + x] = ok; if (occ[y * w + x] >= 0) ok = 0; }
+      ok = 1; for (let x = 0; x < w; x++) { clear[2][y * w + x] = ok; if (occ[y * w + x] >= 0) ok = 0; }
+    }
+    for (let x = 0; x < w; x++) {
+      let ok = 1; for (let y = h - 1; y >= 0; y--) { clear[1][y * w + x] = ok; if (occ[y * w + x] >= 0) ok = 0; }
+      ok = 1; for (let y = 0; y < h; y++) { clear[3][y * w + x] = ok; if (occ[y * w + x] >= 0) ok = 0; }
+    }
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       if (!free(x, y)) continue;
       for (let d = 0; d < 4; d++) {
-        if (!rayClear(x, y, d)) continue;
+        if (!clear[d][y * w + x]) continue;
         const [dx, dy] = DIRS[d];
         const back = free(x - dx, y - dy);
         // نفضّل الخلايا الملاصقة لأسهم موجودة (لوحة متماسكة) والبعيدة عن الحافة
         let wgt = back ? 1 : 0.08;
         let nb = 0; for (const [ax, ay] of DIRS) if (inside(x + ax, y + ay) && occ[(y + ay) * w + x + ax] >= 0) nb++;
         wgt *= 1 + nb * 1.4;
-        wgt *= (1 + cover[y * w + x] * spec.lock) ** 2;
+        wgt *= (1 + cover[y * w + x] * spec.lock) ** (spec.pow || 2);
         // في المسارات الأصعب: رؤوس بعيدة عن الحافة (طريقها طويل فيسهل أن تعيقه أسهم لاحقة)
         if (spec.deep) { const ray = [w - 1 - x, h - 1 - y, x, y][d]; wgt *= 1 + (ray / Math.max(w, h)) * spec.deep; }
         cands.push({ x, y, d, wgt });

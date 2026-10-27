@@ -19,7 +19,7 @@ const P = {
   diff: store.get("diff", "normal"),
   hints: store.get("hints", 5),
   daily: store.get("daily", {}),            // daily[YYYY-MM-DD] = نجوم
-  settings: { sound: true, vibe: true, theme: "paper", colors: false, size: "m", ...store.get("settings", {}) },
+  settings: { sound: true, vibe: true, theme: "paper", colors: false, size: "m", gap: "normal", ...store.get("settings", {}) },
   tut: store.get("tut", 0)
 };
 for (const d of Object.keys(DIFFS)) P.tracks[d] = P.tracks[d] || blank();
@@ -29,7 +29,12 @@ for (const k of ["level", "stars", "best"]) Object.defineProperty(P, k, { get: (
 const save = () => { for (const k of ["tracks", "diff", "hints", "daily", "settings", "tut"]) store.set(k, P[k]); };
 // حجم الأسهم: سماكة الخط وأقصى حجم للخلية على الشاشة
 export const SIZES = { s: { name: "صغير", lw: 0.12, max: 40 }, m: { name: "متوسط", lw: 0.15, max: 50 }, l: { name: "كبير", lw: 0.19, max: 64 } };
-const sizeOf = () => SIZES[P.settings.size] || SIZES.m;
+// التباعد: المسافة بين الأسهم المتجاورة (خط أرفع نسبةً للخلية وأطراف أقصر = فراغ أكبر)
+export const GAPS = { tight: { name: "متقارب", k: 0.78 }, normal: { name: "عادي", k: 1 }, wide: { name: "متباعد", k: 1.35 } };
+const geom = () => {
+  const z = SIZES[P.settings.size] || SIZES.m, g = (GAPS[P.settings.gap] || GAPS.normal).k;
+  return { lw: z.lw / g, max: Math.round(z.max * Math.sqrt(g)), tail: 0.36 + (1 - g) * 0.28, tip: 0.16 + (z.lw / g) * 1.3 };
+};
 setSound(P.settings.sound);
 const vibe = (ms) => { if (P.settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -88,7 +93,7 @@ function createEngine(canvas, level, opts = {}) {
   };
   function fit() {
     const pad = opts.pad ?? 18;
-    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? sizeOf().max);
+    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? geom().max);
     E.view = { s, fit: s, ox: (E.cw - s * level.w) / 2, oy: (E.ch - s * level.h) / 2 };
     E.dirty = true;
   }
@@ -157,19 +162,19 @@ function createEngine(canvas, level, opts = {}) {
   };
   function drawArrow(id, off, color, widthMul = 1, alpha = 1) {
     const a = level.arrows[id], pts = E.paths[id], v = E.view, n = a.cells.length;
-    const t0 = off - 0.36, t1 = off + n - 1 + 0.02;
+    const G0 = geom(), t0 = off - G0.tail, t1 = off + n - 1 + 0.02;
     const line = [pAt(pts, t0)];
     for (let i = Math.ceil(t0); i <= Math.floor(t1); i++) if (i > t0 && i < t1) line.push(pts[i]);
     const head = pAt(pts, t1);
     line.push(head);
     const hd = pAt(pts, t1 + 0.01), dx = hd[0] - head[0], dy = hd[1] - head[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
     const X = (p) => v.ox + p[0] * v.s, Y = (p) => v.oy + p[1] * v.s;
-    const lwF = sizeOf().lw, lw = Math.max(2, v.s * lwF) * widthMul;
+    const lwF = G0.lw, lw = Math.max(2, v.s * lwF) * widthMul;
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(X(line[0]), Y(line[0])); for (let i = 1; i < line.length; i++) ctx.lineTo(X(line[i]), Y(line[i])); ctx.stroke();
     // رأس السهم
-    const tipL = (0.16 + lwF * 1.3) * widthMul ** 0.5, half = Math.max(0.14 + lwF * 0.4, (lw / v.s) * 1.25);
+    const tipL = G0.tip * widthMul ** 0.5, half = Math.max(0.14 + lwF * 0.4, (lw / v.s) * 1.25);
     const tip = [head[0] + ux * tipL, head[1] + uy * tipL], bx = head[0] - ux * 0.04, by = head[1] - uy * 0.04;
     ctx.beginPath();
     ctx.moveTo(X(tip), Y(tip));
@@ -350,6 +355,8 @@ function settings() {
       <label class="sw"><span>🌈 أسهم ملوّنة</span><input type="checkbox" id="s_colors" ${S.colors ? "checked" : ""}></label>
       <p class="lbl">حجم الأسهم</p>
       <div class="seg" id="s_size">${Object.entries(SIZES).map(([k, z]) => `<button data-z="${k}" class="${(S.size || "m") === k ? "on" : ""}"><i style="--w:${z.lw * 30}px"></i>${z.name}</button>`).join("")}</div>
+      <p class="lbl">التباعد بين الأسهم</p>
+      <div class="seg" id="s_gap">${Object.entries(GAPS).map(([k, z]) => `<button data-g="${k}" class="${(S.gap || "normal") === k ? "on" : ""}"><i class="gp" style="--g:${z.k * 5}px"></i>${z.name}</button>`).join("")}</div>
       <p class="lbl">الألوان</p>
       <div class="themes">${Object.entries(THEMES).map(([k, t]) => `<button data-t="${k}" class="${S.theme === k ? "on" : ""}" style="--a:${t.board};--b:${t.ink};--c:${t.bg}"><i></i>${t.name}</button>`).join("")}</div>
       <button class="btn ghost block danger" id="reset">🗑️ مسح التقدّم</button>
@@ -359,6 +366,7 @@ function settings() {
   $("#s_vibe").onchange = (e) => { S.vibe = e.target.checked; save(); vibe(30); };
   $("#s_colors").onchange = (e) => { S.colors = e.target.checked; save(); if (G) G.E.dirty = true; };
   $$("#s_size button").forEach((b) => (b.onclick = () => { S.size = b.dataset.z; save(); $$("#s_size button").forEach((x) => x.classList.toggle("on", x === b)); if (G) G.E.fit(); if (DEMO) DEMO.E.fit(); }));
+  $$("#s_gap button").forEach((b) => (b.onclick = () => { S.gap = b.dataset.g; save(); $$("#s_gap button").forEach((x) => x.classList.toggle("on", x === b)); if (G) G.E.fit(); if (DEMO) DEMO.E.fit(); }));
   $$(".themes button").forEach((b) => (b.onclick = () => { S.theme = b.dataset.t; save(); applyTheme(); $$(".themes button").forEach((x) => x.classList.toggle("on", x === b)); if (G) G.E.dirty = true; if (DEMO) DEMO.E.dirty = true; }));
   $("#reset").onclick = () => {
     if ($("#reset").dataset.sure) { for (const k of ["level", "stars", "best", "tracks", "diff", "hints", "daily", "tut"]) localStorage.removeItem(KEY + k); location.reload(); }
@@ -400,7 +408,16 @@ const startDaily = () => startGame(dailySpec(today()));
 
 function startGame(spec) {
   closeModal(); stopGame(); applyTheme();
-  const level = generate(spec);
+  // اللوحات الأصعب تُختار من عدة محاولات: نعرض «جارٍ التجهيز» حتى لا تبدو الشاشة متجمّدة
+  if ((spec.tries || 1) > 4) {
+    $("#app").innerHTML = `<div class="loading"><div class="spin"></div><p>جارٍ تجهيز لوحة ${DIFFS[spec.diff]?.name || ""}…</p></div>`;
+    const token = (startGame.token = (startGame.token || 0) + 1);
+    setTimeout(() => { if (startGame.token === token && document.querySelector(".loading")) buildGame(spec, generate(spec)); }, 30);
+    return;
+  }
+  buildGame(spec, generate(spec));
+}
+function buildGame(spec, level) {
   if (!spec.daily) P.diff = spec.diff;
   const D = DIFFS[spec.diff] || DIFFS.normal;
   const title = spec.daily ? "📅 تحدّي اليوم" : `${spec.diff !== "normal" ? D.icon + " " : ""}المستوى ${spec.n}`;

@@ -133,3 +133,9 @@ h1, h2 { margin: 0; }
 .seg button i { width: 26px; height: var(--w); border-radius: 3px; background: currentColor; }
 .seg button.on { background: var(--ink); color: var(--bg); }
 @media (orientation: landscape) and (max-height: 520px) { .home .diffs button { flex-direction: row; gap: 4px; padding: 4px; } .home .diffs button small { display: none; } }
+.seg button i.gp { width: 26px; height: 12px; background: linear-gradient(currentColor, currentColor) top / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) bottom / 100% 2px no-repeat; background-size: 100% 2px; border-radius: 0; height: calc(4px + var(--g)); }
+.loading { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--muted); font-weight: 700; }
+.spin { width: 46px; height: 46px; border-radius: 50%; border: 5px solid var(--line); border-top-color: var(--acc); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.diffs { grid-template-columns: repeat(4, 1fr); }
+.diffs button { font-size: 14px; }
