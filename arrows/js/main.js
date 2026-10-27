@@ -27,13 +27,14 @@ if (!DIFFS[P.diff]) P.diff = "normal";
 // P.level و P.stars و P.best تشير إلى المسار المختار حالياً
 for (const k of ["level", "stars", "best"]) Object.defineProperty(P, k, { get: () => P.tracks[P.diff][k], set: (v) => { P.tracks[P.diff][k] = v; } });
 const save = () => { for (const k of ["tracks", "diff", "hints", "daily", "settings", "tut"]) store.set(k, P[k]); };
-// حجم الأسهم: سماكة الخط وأقصى حجم للخلية على الشاشة
-export const SIZES = { s: { name: "صغير", lw: 0.12, max: 40 }, m: { name: "متوسط", lw: 0.15, max: 50 }, l: { name: "كبير", lw: 0.19, max: 64 } };
-// التباعد: المسافة بين الأسهم المتجاورة (خط أرفع نسبةً للخلية وأطراف أقصر = فراغ أكبر)
-export const GAPS = { tight: { name: "متقارب", k: 0.78 }, normal: { name: "عادي", k: 1 }, wide: { name: "متباعد", k: 1.35 } };
+// حجم الأسهم = سماكة الخط فقط. التباعد = المسافة بين الأسهم (حجم الخلية) مع بقاء السماكة نفسها.
+// الإعدادان مستقلان: «صغير» يرقّق الأسهم دائماً، و«متقارب» يقرّبها من بعضها دائماً.
+export const SIZES = { s: { name: "صغير", lw: 0.095 }, m: { name: "متوسط", lw: 0.14 }, l: { name: "كبير", lw: 0.2 } };
+export const GAPS = { tight: { name: "متقارب", k: 0.74 }, normal: { name: "عادي", k: 0.88 }, wide: { name: "متباعد", k: 1 } };
 const geom = () => {
   const z = SIZES[P.settings.size] || SIZES.m, g = (GAPS[P.settings.gap] || GAPS.normal).k;
-  return { lw: z.lw / g, max: Math.round(z.max * Math.sqrt(g)), tail: 0.36 + (1 - g) * 0.28, tip: 0.16 + (z.lw / g) * 1.3 };
+  const lw = z.lw / g; // نسبةً إلى الخلية: الخلية الأصغر (متقارب) بنفس السماكة بالبكسل
+  return { lw, k: g, max: 58, tail: 0.3, tip: 0.13 + lw * 1.25 };
 };
 setSound(P.settings.sound);
 const vibe = (ms) => { if (P.settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
@@ -93,11 +94,12 @@ function createEngine(canvas, level, opts = {}) {
   };
   function fit() {
     const pad = opts.pad ?? 18;
-    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? geom().max);
+    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? geom().max) * (opts.maxCell ? 1 : geom().k);
     E.view = { s, fit: s, ox: (E.cw - s * level.w) / 2, oy: (E.ch - s * level.h) / 2 };
     E.dirty = true;
   }
   E.fit = fit;
+  E.lineWidth = () => Math.max(1.6, E.view.s * geom().lw);
   E.clampView = () => {
     const v = E.view, bw = v.s * level.w, bh = v.s * level.h, m = 60;
     v.ox = bw <= E.cw ? (E.cw - bw) / 2 : Math.min(m, Math.max(E.cw - bw - m, v.ox));
@@ -169,12 +171,12 @@ function createEngine(canvas, level, opts = {}) {
     line.push(head);
     const hd = pAt(pts, t1 + 0.01), dx = hd[0] - head[0], dy = hd[1] - head[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
     const X = (p) => v.ox + p[0] * v.s, Y = (p) => v.oy + p[1] * v.s;
-    const lwF = G0.lw, lw = Math.max(2, v.s * lwF) * widthMul;
+    const lwF = G0.lw, lw = Math.max(1.6, v.s * lwF) * widthMul;
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(X(line[0]), Y(line[0])); for (let i = 1; i < line.length; i++) ctx.lineTo(X(line[i]), Y(line[i])); ctx.stroke();
     // رأس السهم
-    const tipL = G0.tip * widthMul ** 0.5, half = Math.max(0.14 + lwF * 0.4, (lw / v.s) * 1.25);
+    const tipL = G0.tip * widthMul ** 0.5, half = Math.max(0.12 + lwF * 0.45, (lw / v.s) * 1.25);
     const tip = [head[0] + ux * tipL, head[1] + uy * tipL], bx = head[0] - ux * 0.04, by = head[1] - uy * 0.04;
     ctx.beginPath();
     ctx.moveTo(X(tip), Y(tip));
@@ -354,9 +356,9 @@ function settings() {
       <label class="sw"><span>📳 الاهتزاز</span><input type="checkbox" id="s_vibe" ${S.vibe ? "checked" : ""}></label>
       <label class="sw"><span>🌈 أسهم ملوّنة</span><input type="checkbox" id="s_colors" ${S.colors ? "checked" : ""}></label>
       <p class="lbl">حجم الأسهم</p>
-      <div class="seg" id="s_size">${Object.entries(SIZES).map(([k, z]) => `<button data-z="${k}" class="${(S.size || "m") === k ? "on" : ""}"><i style="--w:${z.lw * 30}px"></i>${z.name}</button>`).join("")}</div>
+      <div class="seg" id="s_size">${Object.entries(SIZES).map(([k, z]) => `<button data-z="${k}" class="${(S.size || "m") === k ? "on" : ""}"><i style="--w:${Math.round(z.lw * 34)}px"></i>${z.name}</button>`).join("")}</div>
       <p class="lbl">التباعد بين الأسهم</p>
-      <div class="seg" id="s_gap">${Object.entries(GAPS).map(([k, z]) => `<button data-g="${k}" class="${(S.gap || "normal") === k ? "on" : ""}"><i class="gp" style="--g:${z.k * 5}px"></i>${z.name}</button>`).join("")}</div>
+      <div class="seg" id="s_gap">${Object.entries(GAPS).map(([k, z]) => `<button data-g="${k}" class="${(S.gap || "normal") === k ? "on" : ""}"><i class="gp" style="--g:${Math.round((z.k - 0.6) * 22)}px"></i>${z.name}</button>`).join("")}</div>
       <p class="lbl">الألوان</p>
       <div class="themes">${Object.entries(THEMES).map(([k, t]) => `<button data-t="${k}" class="${S.theme === k ? "on" : ""}" style="--a:${t.board};--b:${t.ink};--c:${t.bg}"><i></i>${t.name}</button>`).join("")}</div>
       <button class="btn ghost block danger" id="reset">🗑️ مسح التقدّم</button>
