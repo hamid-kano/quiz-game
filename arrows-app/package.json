@@ -1,0 +1,17 @@
+{
+  "name": "arrows-puzzle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "فكّ المتاهة: لغز الأسهم (ملفات اللعبة في ../arrows، والمكتبات من المجلد الرئيسي)",
+  "scripts": {
+    "build": "node ../scripts/build-arrows.mjs",
+    "sync": "node ../scripts/build-arrows.mjs && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

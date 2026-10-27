@@ -57,6 +57,7 @@ jobs:
           cp -r qawafil _site/qawafil
           cp -r saytara _site/saytara
           cp -r nitro _site/nitro
+          cp -r arrows _site/arrows
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

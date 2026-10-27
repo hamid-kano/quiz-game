@@ -1,0 +1,10 @@
+{
+  "appId": "app.hamidkano.arrows",
+  "appName": "فكّ المتاهة",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#e9ece4",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

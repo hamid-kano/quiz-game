@@ -27,3 +27,11 @@ nitro-app/android/local.properties
 nitro-app/android/app/src/main/assets/public/
 nitro-app/android/app/src/main/assets/capacitor.config.json
 nitro-app/android/app/src/main/assets/capacitor.plugins.json
+arrows-app/www/
+arrows-app/android/.gradle/
+arrows-app/android/build/
+arrows-app/android/app/build/
+arrows-app/android/local.properties
+arrows-app/android/app/src/main/assets/public/
+arrows-app/android/app/src/main/assets/capacitor.config.json
+arrows-app/android/app/src/main/assets/capacitor.plugins.json

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">فكّ المتاهة</string>
+    <string name="title_activity_main">فكّ المتاهة</string>
+    <string name="package_name">app.hamidkano.arrows</string>
+    <string name="custom_url_scheme">app.hamidkano.arrows</string>
+</resources>

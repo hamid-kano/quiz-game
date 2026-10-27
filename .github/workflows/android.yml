@@ -3,14 +3,14 @@ name: Build Android app
 on:
   push:
     branches: [main]
-    paths: ["kids/**", "android/**", "english/**", "nitro/**", "nitro-app/**", "scripts/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
+    paths: ["kids/**", "android/**", "english/**", "nitro/**", "nitro-app/**", "arrows/**", "arrows-app/**", "scripts/**", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 permissions:
   contents: write   # لنشر ملف APK في صفحة الإصدارات
 
 jobs:
-  # حروفي (العربية) وحروفي English من نفس المحرّك، ولعبة نيترو
+  # حروفي (العربية) وحروفي English من نفس المحرّك، ولعبتا نيترو وفكّ المتاهة
   android:
     strategy:
       fail-fast: false
@@ -34,6 +34,12 @@ jobs:
             tag: android-nitro-latest
             title: نيترو
             check: index.html privacy.html js/main.js js/view.js js/sim.js lib/three.module.min.js lib/three.core.min.js models/vehicle-truck-red.glb models/Textures/colormap.png audio/engine.wav css/style.css
+          - app: arrows
+            dir: arrows-app
+            name: arrows
+            tag: android-arrows-latest
+            title: فكّ المتاهة
+            check: index.html privacy.html js/main.js js/gen.js js/sound.js css/style.css fonts/cairo-arabic-900-normal.woff2
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -60,6 +66,7 @@ jobs:
           npm ci
           if [ "${{ matrix.app }}" = "english" ]; then node scripts/build-english.mjs; fi
           if [ "${{ matrix.app }}" = "nitro" ]; then node scripts/build-nitro.mjs; fi
+          if [ "${{ matrix.app }}" = "arrows" ]; then node scripts/build-arrows.mjs; fi
           cd "${{ matrix.dir }}" && "$GITHUB_WORKSPACE/node_modules/.bin/cap" sync android
 
       - name: Build test APK (debug)
