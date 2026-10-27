@@ -30,6 +30,14 @@ ENGINE = """async () => {
   for (let n = 1; n <= 300; n++) { const sp = G.levelSpec(n), L = G.generate(sp); check(sp, L); fillSum += L.fill; if (L.arrows.length < 4) problems.push('too few arrows ' + n); }
   if (fillSum / 300 < 0.85) problems.push('boards too empty: ' + (fillSum / 300).toFixed(2));
   for (const d of ['2026-10-27', '2026-12-31', '2027-02-28']) check(G.dailySpec(d), G.generate(G.dailySpec(d)));
+  // المسارات الأصعب: قابلة للحل، وأصعب فعلاً (سلسلة اعتماد أعمق من العادي)
+  const depth = { normal: 0, hard: 0, expert: 0 };
+  for (const d of ['normal', 'hard', 'expert']) for (let n = 1; n <= 40; n++) {
+    const sp = G.levelSpec(n, d), L = G.generate(sp), r = check(sp, L);
+    depth[d] += r.depth || 0;
+  }
+  if (!(depth.hard > depth.normal * 1.2 && depth.expert >= depth.hard)) problems.push('difficulty not increasing: ' + JSON.stringify(depth));
+  if (G.generate(G.levelSpec(7, 'hard')).arrows.length === G.generate(G.levelSpec(7, 'normal')).arrows.length && JSON.stringify(G.generate(G.levelSpec(7, 'hard')).arrows) === JSON.stringify(G.generate(G.levelSpec(7, 'normal')).arrows)) problems.push('hard track same as normal');
   if (JSON.stringify(G.generate(G.levelSpec(42)).arrows) !== JSON.stringify(G.generate(G.levelSpec(42)).arrows)) problems.push('level not deterministic');
   return [...new Set(problems)].slice(0, 12);
 }"""
@@ -106,12 +114,35 @@ async def play(b, w, h, errs):
     if await ev("()=>__mz.G.E.board.alive.size") != await ev("()=>__mz.G.total"): out.append(f"{tag}: a drag removed an arrow")
     await pg.click("#fitb"); await pg.wait_for_timeout(100)
     if abs(await ev("()=>__mz.G.E.view.s") - s0) > 0.5: out.append(f"{tag}: fit button did not reset zoom")
+    # مسار الخبير: قلبان، وتقدّم مستقل
+    await ev("()=>__mz.home()"); await pg.wait_for_timeout(200)
+    await pg.click(".diffs [data-d='expert']"); await pg.wait_for_timeout(200); await check("home expert")
+    await pg.click("#play"); await pg.wait_for_timeout(500)
+    if await ev("()=>__mz.G.spec.diff") != "expert" or await pg.locator("#hearts i").count() != 2: out.append(f"{tag}: expert track not applied")
+    if await ev("()=>__mz.P.level") != 1: out.append(f"{tag}: expert progress not separate")
+    for _ in range(80):
+        f = await ev("()=>__mz.free()")
+        if not f: break
+        await ev("(id)=>__mz.G.E.tap(id)", f[0])
+    await pg.wait_for_timeout(1500)
+    if await ev("()=>__mz.P.tracks.expert.level") != 2 or await ev("()=>__mz.P.tracks.normal.level") != 2: out.append(f"{tag}: expert win did not advance its own track")
+    await pg.click("#menu"); await pg.wait_for_timeout(200)
+    await pg.click(".diffs [data-d='normal']"); await pg.wait_for_timeout(200)
+    # حجم الأسهم: الصغير يصغّر الخلايا في اللوحات الصغيرة
+    await ev("()=>__mz.startLevel(1)"); await pg.wait_for_timeout(300)
+    s_m = await ev("()=>__mz.G.E.view.s")
+    await ev("()=>{__mz.P.settings.size='s'; __mz.G.E.fit()}")
+    s_s = await ev("()=>__mz.G.E.view.s")
+    if not s_s < s_m: out.append(f"{tag}: arrow size setting has no effect ({s_m} -> {s_s})")
+    await ev("()=>{__mz.P.settings.size='m'}")
     # التحدّي اليومي، المستويات، الإعدادات
     await ev("()=>__mz.startDaily()"); await pg.wait_for_timeout(300); await check("daily")
     await ev("()=>__mz.levels()"); await pg.wait_for_timeout(200); await check("levels")
     if await pg.locator(".lv:not(.locked)").count() != 2: out.append(f"{tag}: wrong unlocked level count")
     await pg.click("#back"); await pg.wait_for_timeout(200)
     await pg.click("#settings"); await pg.wait_for_timeout(150); await check("settings")
+    await pg.click("#s_size [data-z='l']"); await pg.wait_for_timeout(100)
+    if await ev("()=>__mz.P.settings.size") != "l": out.append(f"{tag}: size setting not saved")
     await pg.click(".themes [data-t='night']"); await pg.wait_for_timeout(100)
     if await ev("()=>document.documentElement.dataset.ui") != "dark": out.append(f"{tag}: theme did not apply")
     await pg.click("#ok")

@@ -123,3 +123,13 @@ h1, h2 { margin: 0; }
   .bar { grid-column: 1 / 3; } .prog { grid-column: 1 / 3; } .stage { grid-column: 1; }
   .tools { grid-column: 2; grid-row: 3; flex-direction: column; justify-content: center; padding: 6px max(12px, env(safe-area-inset-left)) 6px 6px; }
 }
+.diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--card); padding: 5px; border-radius: 16px; box-shadow: 0 2px 8px #0000000d; }
+.diffs button { border: 0; background: transparent; border-radius: 12px; padding: 5px 2px; font-weight: 900; font-size: 15px; display: flex; flex-direction: column; align-items: center; line-height: 1.2; color: var(--muted); }
+.diffs button span { font-size: 18px; } .diffs button small { font-size: 10.5px; font-weight: 700; min-height: 13px; color: var(--green); }
+.diffs button.on { background: var(--ink); color: var(--bg); } .diffs button.on small { color: #7be495; }
+.screen .diffs { margin-bottom: 10px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: var(--card); padding: 5px; border-radius: 14px; }
+.seg button { border: 0; border-radius: 10px; padding: 8px 4px; background: transparent; font-weight: 900; font-size: 14px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 8px; }
+.seg button i { width: 26px; height: var(--w); border-radius: 3px; background: currentColor; }
+.seg button.on { background: var(--ink); color: var(--bg); }
+@media (orientation: landscape) and (max-height: 520px) { .home .diffs button { flex-direction: row; gap: 4px; padding: 4px; } .home .diffs button small { display: none; } }

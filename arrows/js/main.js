@@ -1,7 +1,7 @@
 // ============================================================
 //  فكّ المتاهة: الشاشات، الرسم والحركة، اللمس (نقر، سحب، تقريب)، القلوب والنجوم والتلميحات، والحفظ
 // ============================================================
-import { DIRS, levelSpec, dailySpec, generate, makeBoard, blocker, exitLength, removeArrow, freeArrows, SHAPE_NAMES } from "./gen.js";
+import { DIRS, DIFFS, levelSpec, dailySpec, generate, makeBoard, blocker, exitLength, removeArrow, freeArrows, SHAPE_NAMES } from "./gen.js";
 import { sfx, setSound, unlock } from "./sound.js";
 
 const $ = (q) => document.querySelector(q);
@@ -12,21 +12,29 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(KEY + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} }
 };
+// التقدّم مستقل لكل مسار صعوبة: tracks[diff] = { level (أعلى مستوى مفتوح), stars, best }
+const blank = () => ({ level: 1, stars: {}, best: {} });
 const P = {
-  level: store.get("level", 1),             // أعلى مستوى مفتوح
-  stars: store.get("stars", {}),
-  best: store.get("best", {}),
+  tracks: store.get("tracks", null) || { normal: { level: store.get("level", 1), stars: store.get("stars", {}), best: store.get("best", {}) }, hard: blank(), expert: blank() },
+  diff: store.get("diff", "normal"),
   hints: store.get("hints", 5),
   daily: store.get("daily", {}),            // daily[YYYY-MM-DD] = نجوم
-  settings: store.get("settings", { sound: true, vibe: true, theme: "paper", colors: false }),
+  settings: { sound: true, vibe: true, theme: "paper", colors: false, size: "m", ...store.get("settings", {}) },
   tut: store.get("tut", 0)
 };
-const save = () => { for (const k of ["level", "stars", "best", "hints", "daily", "settings", "tut"]) store.set(k, P[k]); };
+for (const d of Object.keys(DIFFS)) P.tracks[d] = P.tracks[d] || blank();
+if (!DIFFS[P.diff]) P.diff = "normal";
+// P.level و P.stars و P.best تشير إلى المسار المختار حالياً
+for (const k of ["level", "stars", "best"]) Object.defineProperty(P, k, { get: () => P.tracks[P.diff][k], set: (v) => { P.tracks[P.diff][k] = v; } });
+const save = () => { for (const k of ["tracks", "diff", "hints", "daily", "settings", "tut"]) store.set(k, P[k]); };
+// حجم الأسهم: سماكة الخط وأقصى حجم للخلية على الشاشة
+export const SIZES = { s: { name: "صغير", lw: 0.12, max: 40 }, m: { name: "متوسط", lw: 0.15, max: 50 }, l: { name: "كبير", lw: 0.19, max: 64 } };
+const sizeOf = () => SIZES[P.settings.size] || SIZES.m;
 setSound(P.settings.sound);
 const vibe = (ms) => { if (P.settings.vibe) try { navigator.vibrate?.(ms); } catch {} };
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const totalStars = () => Object.values(P.stars).reduce((a, b) => a + b, 0);
+const totalStars = () => Object.values(P.tracks).reduce((a, t) => a + Object.values(t.stars).reduce((x, y) => x + y, 0), 0);
 
 // ---------------- الألوان ----------------
 export const THEMES = {
@@ -80,7 +88,7 @@ function createEngine(canvas, level, opts = {}) {
   };
   function fit() {
     const pad = opts.pad ?? 18;
-    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? 64);
+    const s = Math.min((E.cw - pad * 2) / level.w, (E.ch - pad * 2) / level.h, opts.maxCell ?? sizeOf().max);
     E.view = { s, fit: s, ox: (E.cw - s * level.w) / 2, oy: (E.ch - s * level.h) / 2 };
     E.dirty = true;
   }
@@ -156,12 +164,12 @@ function createEngine(canvas, level, opts = {}) {
     line.push(head);
     const hd = pAt(pts, t1 + 0.01), dx = hd[0] - head[0], dy = hd[1] - head[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
     const X = (p) => v.ox + p[0] * v.s, Y = (p) => v.oy + p[1] * v.s;
-    const lw = Math.max(2.4, v.s * 0.19) * widthMul;
+    const lwF = sizeOf().lw, lw = Math.max(2, v.s * lwF) * widthMul;
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(X(line[0]), Y(line[0])); for (let i = 1; i < line.length; i++) ctx.lineTo(X(line[i]), Y(line[i])); ctx.stroke();
     // رأس السهم
-    const tipL = 0.4 * widthMul ** 0.5, half = Math.max(0.22, (lw / v.s) * 1.25);
+    const tipL = (0.16 + lwF * 1.3) * widthMul ** 0.5, half = Math.max(0.14 + lwF * 0.4, (lw / v.s) * 1.25);
     const tip = [head[0] + ux * tipL, head[1] + uy * tipL], bx = head[0] - ux * 0.04, by = head[1] - uy * 0.04;
     ctx.beginPath();
     ctx.moveTo(X(tip), Y(tip));
@@ -266,7 +274,7 @@ function frame(now) {
 
 // ---------------- الشاشة الرئيسية مع لوحة تحلّ نفسها ----------------
 function home() {
-  stopGame();
+  stopGame(); closeModal();
   applyTheme();
   const daily = P.daily[today()];
   $("#app").innerHTML = `
@@ -275,6 +283,7 @@ function home() {
       <h1 class="logo">فكّ <b>المتاهة</b></h1>
       <p class="tag">اضغط السهم الذي طريقه فارغ… وأفرغ اللوحة</p>
       <div class="menu">
+        ${diffSeg()}
         <button class="btn big" id="play"><span>▶</span> المستوى ${P.level}</button>
         <div class="row">
           <button class="btn alt" id="levels">🗂️ المستويات</button>
@@ -288,11 +297,18 @@ function home() {
       <p class="foot">⭐ ${totalStars()} · 💡 ${P.hints} · تعمل بدون إنترنت</p>
     </main>`;
   $("#play").onclick = () => startLevel(P.level);
+  bindDiffSeg(home);
   $("#levels").onclick = () => levels();
   $("#daily").onclick = () => startDaily();
   $("#help").onclick = () => help();
   $("#settings").onclick = settings;
   startDemo();
+}
+function diffSeg() {
+  return `<div class="diffs">${Object.entries(DIFFS).map(([k, d]) => `<button data-d="${k}" class="${P.diff === k ? "on" : ""}"><span>${d.icon}</span>${d.name}<small>${P.tracks[k].level - 1 ? "✓ " + (P.tracks[k].level - 1) : ""}</small></button>`).join("")}</div>`;
+}
+function bindDiffSeg(again) {
+  $$(".diffs button").forEach((b) => (b.onclick = () => { if (P.diff === b.dataset.d) return; P.diff = b.dataset.d; save(); sfx.click(); again(); if (b.dataset.d === "expert" && !store.get("expertSeen", false)) { store.set("expertSeen", true); toast("💀 الخبير: لوحات أكبر، أسهم أطول وأكثر تشابكاً، وقلبان فقط"); } }));
 }
 let demoSeed = 1;
 function startDemo() {
@@ -332,6 +348,8 @@ function settings() {
       <label class="sw"><span>🔊 الأصوات</span><input type="checkbox" id="s_sound" ${S.sound ? "checked" : ""}></label>
       <label class="sw"><span>📳 الاهتزاز</span><input type="checkbox" id="s_vibe" ${S.vibe ? "checked" : ""}></label>
       <label class="sw"><span>🌈 أسهم ملوّنة</span><input type="checkbox" id="s_colors" ${S.colors ? "checked" : ""}></label>
+      <p class="lbl">حجم الأسهم</p>
+      <div class="seg" id="s_size">${Object.entries(SIZES).map(([k, z]) => `<button data-z="${k}" class="${(S.size || "m") === k ? "on" : ""}"><i style="--w:${z.lw * 30}px"></i>${z.name}</button>`).join("")}</div>
       <p class="lbl">الألوان</p>
       <div class="themes">${Object.entries(THEMES).map(([k, t]) => `<button data-t="${k}" class="${S.theme === k ? "on" : ""}" style="--a:${t.board};--b:${t.ink};--c:${t.bg}"><i></i>${t.name}</button>`).join("")}</div>
       <button class="btn ghost block danger" id="reset">🗑️ مسح التقدّم</button>
@@ -340,9 +358,10 @@ function settings() {
   $("#s_sound").onchange = (e) => { S.sound = e.target.checked; setSound(S.sound); save(); };
   $("#s_vibe").onchange = (e) => { S.vibe = e.target.checked; save(); vibe(30); };
   $("#s_colors").onchange = (e) => { S.colors = e.target.checked; save(); if (G) G.E.dirty = true; };
+  $$("#s_size button").forEach((b) => (b.onclick = () => { S.size = b.dataset.z; save(); $$("#s_size button").forEach((x) => x.classList.toggle("on", x === b)); if (G) G.E.fit(); if (DEMO) DEMO.E.fit(); }));
   $$(".themes button").forEach((b) => (b.onclick = () => { S.theme = b.dataset.t; save(); applyTheme(); $$(".themes button").forEach((x) => x.classList.toggle("on", x === b)); if (G) G.E.dirty = true; if (DEMO) DEMO.E.dirty = true; }));
   $("#reset").onclick = () => {
-    if ($("#reset").dataset.sure) { for (const k of ["level", "stars", "best", "hints", "daily", "tut"]) localStorage.removeItem(KEY + k); location.reload(); }
+    if ($("#reset").dataset.sure) { for (const k of ["level", "stars", "best", "tracks", "diff", "hints", "daily", "tut"]) localStorage.removeItem(KEY + k); location.reload(); }
     else { $("#reset").dataset.sure = 1; $("#reset").textContent = "اضغط مرة أخرى للتأكيد"; }
   };
   $("#ok").onclick = () => { closeModal(); if (!G) home(); };
@@ -351,14 +370,15 @@ function settings() {
 // ---------------- قائمة المستويات ----------------
 const PAGE = 24;
 function levels(page = Math.floor((P.level - 1) / PAGE)) {
-  stopGame();
+  stopGame(); closeModal();
   const from = page * PAGE + 1;
   $("#app").innerHTML = `
     <main class="screen">
       <div class="top"><button class="icon" id="back">→</button><h2>🗂️ المستويات</h2><span class="pill">⭐ ${totalStars()}</span></div>
+      ${diffSeg()}
       <div class="pager"><button class="icon" id="prev" ${page ? "" : "disabled"}>▶</button><b>${from} – ${from + PAGE - 1}</b><button class="icon" id="nextp" ${from + PAGE <= P.level ? "" : "disabled"}>◀</button></div>
       <div class="grid">${Array.from({ length: PAGE }, (_, i) => {
-        const n = from + i, open = n <= P.level, st = P.stars[n] || 0, sp = levelSpec(n);
+        const n = from + i, open = n <= P.level, st = P.stars[n] || 0, sp = levelSpec(n, P.diff);
         return `<button class="lv ${open ? "" : "locked"} ${n === P.level ? "cur" : ""}" data-n="${n}" ${open ? "" : "disabled"}>
           <b>${open ? n : "🔒"}</b><small>${sp.w}×${sp.h}${sp.shape !== "square" ? " · " + SHAPE_NAMES[sp.shape] : ""}</small>
           <span class="st">${"★".repeat(st)}<em>${"★".repeat(3 - st)}</em></span></button>`;
@@ -368,19 +388,22 @@ function levels(page = Math.floor((P.level - 1) / PAGE)) {
   $("#prev").onclick = () => levels(page - 1);
   $("#nextp").onclick = () => levels(page + 1);
   $$(".lv").forEach((b) => (b.onclick = () => startLevel(+b.dataset.n)));
+  bindDiffSeg(() => levels());
 }
 
 // ============================================================
 //  اللعب
 // ============================================================
 function stopGame() { G = null; DEMO = null; }
-const startLevel = (n) => startGame(levelSpec(n));
+const startLevel = (n) => startGame(levelSpec(n, P.diff));
 const startDaily = () => startGame(dailySpec(today()));
 
 function startGame(spec) {
   closeModal(); stopGame(); applyTheme();
   const level = generate(spec);
-  const title = spec.daily ? "📅 تحدّي اليوم" : `المستوى ${spec.n}`;
+  if (!spec.daily) P.diff = spec.diff;
+  const D = DIFFS[spec.diff] || DIFFS.normal;
+  const title = spec.daily ? "📅 تحدّي اليوم" : `${spec.diff !== "normal" ? D.icon + " " : ""}المستوى ${spec.n}`;
   $("#app").innerHTML = `
     <div class="game">
       <header class="bar">
@@ -397,7 +420,7 @@ function startGame(spec) {
       </footer>
     </div>`;
   const E = createEngine($("#cv"), level, { pad: 16 });
-  G = { spec, E, hearts: 3, mistakes: 0, t: 0, startT: performance.now(), over: false, total: level.arrows.length, pointers: new Map(), tut: !spec.daily && spec.n === 1 && P.tut < 2 ? 0 : -1 };
+  G = { spec, E, hearts: D.hearts, maxHearts: D.hearts, mistakes: 0, t: 0, startT: performance.now(), over: false, total: level.arrows.length, pointers: new Map(), tut: !spec.daily && spec.n === 1 && spec.diff === "normal" && P.tut < 2 ? 0 : -1 };
   hearts();
   progress();
   $("#back").onclick = () => (spec.daily ? home() : levels());
@@ -408,7 +431,7 @@ function startGame(spec) {
   if (G.tut === 0) coach();
 }
 function hearts() {
-  $("#hearts").innerHTML = [0, 1, 2].map((i) => `<i class="${i < G.hearts ? "" : "lost"}">❤</i>`).join("");
+  $("#hearts").innerHTML = Array.from({ length: G.maxHearts }, (_, i) => `<i class="${i < G.hearts ? "" : "lost"}">❤</i>`).join("");
 }
 function progress() {
   const left = G.E.board.alive.size;

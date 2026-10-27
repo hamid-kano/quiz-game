@@ -30,31 +30,61 @@ export const SHAPE_NAMES = { square: "مربع", circle: "دائرة", diamond: 
 
 // ---------- مواصفات كل مستوى ----------
 const SHAPE_CYCLE = ["circle", "diamond", "heart", "plus", "ring", "hourglass", "stairs", "frame"];
-export function levelSpec(n) {
-  const size = Math.min(18, 4 + Math.floor((n - 1) / 5));
+// المسارات: عادي، صعب، خبير. كل مسار له لوحات مختلفة وتقدّم مستقل
+export const DIFFS = {
+  normal: { name: "عادي", icon: "😊", hearts: 3 },
+  hard: { name: "صعب", icon: "🔥", hearts: 3 },
+  expert: { name: "خبير", icon: "💀", hearts: 2 }
+};
+export function levelSpec(n, diff = "normal") {
+  const D = { normal: { start: 4, step: 5, cap: 18, len: 0, turn: 0, lock: 0, k: 1 }, hard: { start: 8, step: 4, cap: 18, len: 3, turn: 0.1, lock: 1.2, k: 6, deep: 3 }, expert: { start: 10, step: 3, cap: 20, len: 5, turn: 0.16, lock: 2.2, k: 10, deep: 6 } }[diff] || {};
+  const size = Math.min(D.cap, D.start + Math.floor((n - 1) / D.step));
   let shape = "square", w = size, h = size;
-  if (n >= 12 && n % 5 === 0) { shape = SHAPE_CYCLE[Math.floor(n / 5) % SHAPE_CYCLE.length]; w = h = Math.min(20, size + 2); }
-  else if (n >= 8 && n % 7 === 3) { h = Math.min(20, size + 3); } // لوحات مستطيلة طولية تناسب الجوال
-  return { n, seed: 7919 * n + 104729, w, h, shape, maxLen: 3 + Math.floor(Math.max(w, h) / 2.2), turn: Math.min(0.5, 0.18 + n * 0.006), lock: Math.min(2.5, 0.3 + n * 0.04) };
+  if (n >= (diff === "normal" ? 12 : 4) && n % 5 === 0) { shape = SHAPE_CYCLE[Math.floor(n / 5) % SHAPE_CYCLE.length]; w = h = Math.min(D.cap + 2, size + 2); }
+  else if (n >= 8 && n % 7 === 3) { h = Math.min(D.cap + 2, size + 3); } // لوحات مستطيلة طولية تناسب الجوال
+  const seed = 7919 * n + 104729 + { normal: 0, hard: 1000003, expert: 2000006 }[diff];
+  return {
+    n, diff, seed, w, h, shape,
+    maxLen: 3 + Math.floor(Math.max(w, h) / 2.2) + D.len,
+    turn: Math.min(0.62, 0.18 + n * 0.006 + D.turn),
+    lock: Math.min(2.5 + D.lock * 1.5, 0.3 + n * 0.04 + D.lock),
+    tries: D.k, deep: D.deep || 0
+  };
 }
 export function dailySpec(dateStr) {
   let s = 0; for (const ch of dateStr) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
   const R = rng(s);
   const shapes = ["square", "circle", "heart", "diamond", "plus", "ring", "hourglass", "stairs"];
   const sz = 13 + Math.floor(R() * 4);
-  return { n: 0, daily: dateStr, seed: s, w: sz, h: sz + (R() < 0.3 ? 3 : 0), shape: shapes[Math.floor(R() * shapes.length)], maxLen: 9, turn: 0.4, lock: 2 };
+  return { n: 0, daily: dateStr, seed: s, w: sz, h: sz + (R() < 0.3 ? 3 : 0), shape: shapes[Math.floor(R() * shapes.length)], maxLen: 10, turn: 0.45, lock: 2.6, tries: 6, deep: 3 };
 }
 
 // ---------- التوليد ----------
 // النتيجة: { w, h, mask, arrows: [{ id, cells: [[x,y], ...] (من الذيل إلى الرأس), dir }] }
+// في المسارات الأصعب نولّد عدة لوحات ونختار الأصعب: أقل نسبة أسهم حرة في البداية وأعمق سلسلة اعتماد
 export function generate(spec) {
-  let best = null;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const b = build(spec, rng(spec.seed + attempt * 977));
-    if (!best || b.fill > best.fill) best = b;
-    if (b.fill >= 0.9) break;
+  const pick = (attempts) => {
+    let best = null;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const b = build(spec, rng(spec.seed + attempt * 977));
+      if (!best || b.fill > best.fill) best = b;
+      if (b.fill >= 0.9) break;
+    }
+    return best;
+  };
+  const tries = spec.tries || 1;
+  if (tries <= 1) return pick(6);
+  let best = null, bestScore = -1e9;
+  for (let k = 0; k < tries; k++) {
+    const b = pick(3, k);
+    spec = { ...spec, seed: spec.seed + 7777 };
+    if (b.fill < 0.78) continue;
+    const s = solve(b), free = freeArrows(makeBoard(b)).length / b.arrows.length;
+    const score = s.depth * 1.5 - free * 12 + b.fill * 6 + b.arrows.reduce((a, x) => a + x.cells.length, 0) / b.arrows.length * 0.6;
+    b.depth = s.depth; b.freeRatio = free;
+    if (score > bestScore) { bestScore = score; best = b; }
   }
-  return best;
+  return best || pick(6);
 }
 
 function build(spec, R) {
@@ -85,6 +115,8 @@ function build(spec, R) {
         let nb = 0; for (const [ax, ay] of DIRS) if (inside(x + ax, y + ay) && occ[(y + ay) * w + x + ax] >= 0) nb++;
         wgt *= 1 + nb * 1.4;
         wgt *= (1 + cover[y * w + x] * spec.lock) ** 2;
+        // في المسارات الأصعب: رؤوس بعيدة عن الحافة (طريقها طويل فيسهل أن تعيقه أسهم لاحقة)
+        if (spec.deep) { const ray = [w - 1 - x, h - 1 - y, x, y][d]; wgt *= 1 + (ray / Math.max(w, h)) * spec.deep; }
         cands.push({ x, y, d, wgt });
       }
     }
