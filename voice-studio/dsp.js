@@ -229,33 +229,34 @@
     return out;
   }
 
-  // ---------- قياس الارتفاع LUFS (ITU-R BS.1770) ----------
-  function lufs(x, sr) {
-    let k = biquad(x, biquadCoefs('highshelf', 1681.974, sr, 0.7072, 3.99984));
-    k = biquad(k, biquadCoefs('highpass', 38.1355, sr, 0.5003));
-    const block = Math.round(0.4 * sr), step = Math.round(0.1 * sr);
+  // ---------- قياس الارتفاع LUFS (ITU-R BS.1770) — قناة أو أكثر ----------
+  function lufsCh(chs, sr) {
+    const ks = chs.map(x => biquad(biquad(x, biquadCoefs('highshelf', 1681.974, sr, 0.7072, 3.99984)), biquadCoefs('highpass', 38.1355, sr, 0.5003)));
+    const len = ks[0].length, block = Math.round(0.4 * sr), step = Math.round(0.1 * sr);
+    const L = m => -0.691 + 10 * Math.log10(m + 1e-20);
     const ms = [];
-    for (let s = 0; s + block <= k.length; s += step) {
-      let e = 0; for (let i = s; i < s + block; i++) e += k[i] * k[i];
+    for (let s = 0; s + block <= len; s += step) {
+      let e = 0; for (const k of ks) for (let i = s; i < s + block; i++) e += k[i] * k[i];
       ms.push(e / block);
     }
-    if (!ms.length) { let e = 0; for (let i = 0; i < k.length; i++) e += k[i] * k[i]; return -0.691 + 10 * Math.log10(e / Math.max(1, k.length) + 1e-20); }
-    const L = m => -0.691 + 10 * Math.log10(m + 1e-20);
-    let g1 = ms.filter(m => L(m) > -70);
+    if (!ms.length) { let e = 0; for (const k of ks) for (let i = 0; i < len; i++) e += k[i] * k[i]; return L(e / Math.max(1, len)); }
+    const g1 = ms.filter(m => L(m) > -70);
     if (!g1.length) return -70;
-    const mean1 = g1.reduce((a, b) => a + b, 0) / g1.length;
-    const rel = L(mean1) - 10;
+    const rel = L(g1.reduce((a, b) => a + b, 0) / g1.length) - 10;
     const g2 = g1.filter(m => L(m) > rel);
     return L(g2.reduce((a, b) => a + b, 0) / g2.length);
   }
+  function lufs(x, sr) { return lufsCh([x], sr); }
   function peakDb(x) { let p = 0; for (let i = 0; i < x.length; i++) { const v = Math.abs(x[i]); if (v > p) p = v; } return 20 * Math.log10(p + 1e-20); }
 
-  // ---------- محدد (Look-ahead limiter) ----------
-  function limit(x, sr, ceilDb) {
-    const ceil = Math.pow(10, ceilDb / 20), L = Math.max(1, Math.round(0.005 * sr)), n = x.length;
+  // ---------- محدد (Look-ahead limiter) — مربوط بين القنوات ----------
+  function limitCh(chs, sr, ceilDb) {
+    const ceil = Math.pow(10, ceilDb / 20), L = Math.max(1, Math.round(0.005 * sr)), n = chs[0].length;
     const r = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const a = Math.abs(x[i]); r[i] = a > ceil ? ceil / a : 1; }
-    // أصغر قيمة في النافذة [i, i+L]
+    for (let i = 0; i < n; i++) {
+      let a = 0; for (const c of chs) { const v = Math.abs(c[i]); if (v > a) a = v; }
+      r[i] = a > ceil ? ceil / a : 1;
+    }
     const m = new Float32Array(n), dq = new Int32Array(n + L + 1); let h = 0, t = 0;
     for (let i = n - 1; i >= 0; i--) {
       while (t > h && r[dq[t - 1]] >= r[i]) t--;
@@ -266,13 +267,50 @@
     const rel = Math.exp(-1 / (0.08 * sr));
     let g = 1;
     for (let i = 0; i < n; i++) { g = m[i] < g ? m[i] : rel * g + (1 - rel) * m[i]; if (g > m[i]) g = m[i]; m[i] = g; }
-    const y = new Float32Array(n); let sum = 0;
-    const buf = new Float32Array(L + 1).fill(1); let bi = 0; sum = L + 1;
+    const outs = chs.map(() => new Float32Array(n));
+    const buf = new Float32Array(L + 1).fill(1); let bi = 0, sum = L + 1;
     for (let i = 0; i < n; i++) {
       sum += m[i] - buf[bi]; buf[bi] = m[i]; bi = (bi + 1) % (L + 1);
-      y[i] = x[i] * (sum / (L + 1));
+      const gg = sum / (L + 1);
+      for (let c = 0; c < chs.length; c++) outs[c][i] = chs[c][i] * gg;
     }
-    return y;
+    return outs;
+  }
+  function limit(x, sr, ceilDb) { return limitCh([x], sr, ceilDb)[0]; }
+
+  // ---------- منحنى خفض الموسيقى وقت الكلام (Ducking) ----------
+  // يرجع كسب لكل عيّنة على طول total، والصوت يبدأ عند start
+  function duckCurve(voice, sr, total, start, duckDb) {
+    const g = new Float32Array(total).fill(1);
+    if (!voice || !duckDb) return g;
+    const fr = Math.round(0.01 * sr), nf = Math.ceil(voice.length / fr);
+    const rms = new Float32Array(nf);
+    for (let f = 0; f < nf; f++) {
+      let e = 0, c = 0; for (let i = f * fr; i < Math.min(voice.length, (f + 1) * fr); i++) { e += voice[i] * voice[i]; c++; }
+      rms[f] = Math.sqrt(e / Math.max(1, c));
+    }
+    const sorted = Array.from(rms).sort((a, b) => a - b);
+    const ref = sorted[Math.floor(sorted.length * 0.95)] || 0;
+    const thr = ref * Math.pow(10, -26 / 20);
+    const low = Math.pow(10, -Math.abs(duckDb) / 20);
+    const hold = 35, aC = Math.exp(-1 / 25), rC = Math.exp(-1 / 80); // إطارات 10ms
+    const gf = new Float32Array(nf + 1); let h = 0, cur = 1;
+    for (let f = 0; f < nf; f++) {
+      if (rms[f] > thr) h = hold; else if (h > 0) h--;
+      const tgt = h > 0 ? low : 1;
+      cur = tgt < cur ? aC * cur + (1 - aC) * tgt : rC * cur + (1 - rC) * tgt;
+      gf[f] = cur;
+    }
+    gf[nf] = 1;
+    // تبدأ النزلة قبل الكلام بقليل (look-ahead 150ms)
+    const la = Math.round(0.15 * sr);
+    for (let i = 0; i < total; i++) {
+      const vi = i - start + la;
+      if (vi < 0 || vi >= voice.length + fr) continue;
+      const p = vi / fr, f = Math.min(nf - 1, p | 0), t = p - f;
+      g[i] = gf[f] * (1 - t) + gf[f + 1] * t;
+    }
+    return g;
   }
 
   // ---------- صدى (Impulse response) ----------
@@ -310,6 +348,6 @@
   }
   function toInt16(x) { const y = new Int16Array(x.length); for (let i = 0; i < x.length; i++) { const s = Math.max(-1, Math.min(1, x[i])); y[i] = s < 0 ? s * 0x8000 : s * 0x7fff; } return y; }
 
-  const DSP = { denoise, gate, deess, pitchShift, lufs, peakDb, limit, makeImpulse, encodeWav, toInt16, biquad, biquadCoefs };
+  const DSP = { denoise, gate, deess, pitchShift, lufs, lufsCh, peakDb, limit, limitCh, duckCurve, makeImpulse, encodeWav, toInt16, biquad, biquadCoefs };
   if (typeof module !== 'undefined' && module.exports) module.exports = DSP; else root.DSP = DSP;
 })(typeof self !== 'undefined' ? self : this);
