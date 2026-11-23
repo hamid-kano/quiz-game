@@ -9,14 +9,54 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read   # لمعرفة آخر نشر ناجح
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  # الاختبارات الآلية: إذا فشل أي اختبار لا يُنشر التطبيق
+  # يحدد أي المشاريع تغيّرت منذ آخر نشر ناجح، حتى لا نختبر مشاريع ما تعدّلت
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      huroofi: ${{ steps.f.outputs.huroofi }}
+      tests: ${{ steps.f.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BASE=$(gh api "repos/${{ github.repository }}/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' || true)
+          ALL=0
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            ALL=1; echo "اختبار كل المشاريع"
+          else
+            git diff --name-only "$BASE" "${{ github.sha }}" > changed.txt
+            echo "الملفات المتغيرة منذ آخر نشر ناجح ($BASE):"; cat changed.txt
+            # تغيير في أدوات الاختبار المشتركة = اختبار الكل
+            grep -qE '^(tests/(helpers|run_all)\.py|index\.html)$' changed.txt && ALL=1
+          fi
+          has() { [ "$ALL" = 1 ] || grep -qE "$1" changed.txt; }
+          T=""; H=false
+          if has '^(kids|english|scripts)/|^tests/test_(content|native|layout|speech|writing_check|activities)\.py$'; then
+            H=true; T="test_content.py test_native.py test_layout.py test_speech.py test_writing_check.py test_activities.py"
+          fi
+          for g in qawafil saytara nitro arrows; do
+            has "^$g/|^tests/test_$g\.py$" && T="$T test_$g.py"
+          done
+          T=$(echo $T)
+          echo "huroofi=$H" >> "$GITHUB_OUTPUT"
+          echo "tests=$T" >> "$GITHUB_OUTPUT"
+          echo "### الاختبارات المطلوبة: ${T:-لا شيء — نشر مباشر}" >> "$GITHUB_STEP_SUMMARY"
+
+  # الاختبارات الآلية للمشاريع المتغيرة فقط: إذا فشل أي اختبار لا يُنشر الموقع
   test:
+    needs: changes
+    if: needs.changes.outputs.tests != ''
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -29,16 +69,20 @@ jobs:
           pip install playwright
           python -m playwright install --with-deps chromium
       - name: Build the English app
+        if: needs.changes.outputs.huroofi == 'true'
         run: node scripts/build-english.mjs
-      - name: Run tests (Arabic app)
-        run: python tests/run_all.py
+      - name: Run tests (Arabic app + games)
+        run: python tests/run_all.py ${{ needs.changes.outputs.tests }}
       - name: Run tests (English app)
+        if: needs.changes.outputs.huroofi == 'true'
         env:
           HUROOFI_APP: english
         run: python tests/run_all.py test_content.py test_layout.py test_speech.py test_activities.py
 
   deploy:
-    needs: test
+    needs: [changes, test]
+    # ينشر إذا نجحت الاختبارات أو لم تكن مطلوبة
+    if: always() && needs.changes.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -46,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      # ننشر الموقع فقط (صفحة البداية وتطبيقا حروفي)، دون ملفات أندرويد والاختبارات
+      # ننشر الموقع فقط (صفحة البداية والتطبيقات والألعاب)، دون ملفات أندرويد والاختبارات
       - name: Prepare site
         run: |
           mkdir -p _site
