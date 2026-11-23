@@ -14,6 +14,8 @@
 
 **🧩 فكّ المتاهة (لغز الأسهم):** https://hamid-kano.github.io/quiz-game/arrows/
 
+**🎙️ استوديو الصوت (تحسين التسجيلات للإعلانات):** https://hamid-kano.github.io/quiz-game/voice-studio/
+
 ## التشغيل محلياً
 ```bash
 npx serve .

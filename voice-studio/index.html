@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>استوديو الصوت — هايبر تك</title>
+<meta name="description" content="حسّن تسجيلك الصوتي للإعلانات والسوشيال ميديا مباشرة من المتصفح">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2a333e;
+    --fg:#e8edf2; --muted:#8b97a5; --accent:#f5a524; --accent2:#3fb6a8; --danger:#e5534b;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:Tajawal,system-ui,sans-serif;font-size:16px;line-height:1.6}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0 16px}
+  header h1{margin:0;font-size:1.5rem;font-weight:800}
+  header h1 span{color:var(--accent)}
+  header p{margin:0;color:var(--muted);font-size:.9rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
+  summary{cursor:pointer;font-weight:700;font-size:1.05rem;list-style:none}
+  summary::before{content:"▾ ";color:var(--accent)}
+  details:not([open]) summary::before{content:"◂ "}
+  #drop{display:block;cursor:pointer;border:2px dashed var(--line);border-radius:var(--r);padding:28px 16px;text-align:center;transition:.2s;background:var(--panel)}
+  #drop.over{border-color:var(--accent);background:var(--panel2)}
+  #drop b{display:block;font-size:1.15rem;margin-bottom:4px}
+  #drop small{color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);
+       border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;min-height:44px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#1a1300;border-color:var(--accent)}
+  .btn.ghost{background:transparent}
+  label.btn input{display:none}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .grow{flex:1}
+  select{font:inherit;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:44px;max-width:100%}
+  .app{display:none}
+  body.loaded .app{display:block}
+  body.loaded #drop{padding:12px}
+  body.loaded #drop .big{display:none}
+  .player canvas{width:100%;display:block;border-radius:10px;background:var(--panel2);direction:ltr}
+  #wave{height:110px;cursor:pointer}
+  #spec{height:70px;margin-top:8px}
+  .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:.85rem;margin:6px 2px}
+  #time{direction:ltr;font-variant-numeric:tabular-nums}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg label{padding:10px 14px;cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+  .seg input{display:none}
+  .seg input:checked+span{color:var(--accent)}
+  .seg label:has(input:checked){background:var(--panel2)}
+  .meters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .meter{background:var(--panel2);border-radius:10px;padding:8px 10px;text-align:center}
+  .meter div{color:var(--muted);font-size:.78rem}
+  .meter b{font-size:1.15rem;direction:ltr;display:inline-block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+  #controls .card{margin-bottom:14px}
+  .ctl{padding:10px 0;border-top:1px solid var(--line)}
+  .ctl:first-of-type{border-top:0}
+  .ctl-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .ctl-h label{font-weight:500}
+  .ctl output{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  input[type=range]{width:100%;accent-color:var(--accent);height:28px;direction:ltr}
+  .tip{color:var(--muted);font-size:.8rem}
+  #status{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(120%);background:var(--accent);color:#1a1300;
+          padding:10px 18px;border-radius:999px;font-weight:700;transition:.25s;z-index:10;opacity:0;box-shadow:0 6px 24px #0008}
+  #status.on{transform:translateX(-50%) translateY(0);opacity:1}
+  #done{color:var(--accent2);font-weight:700;margin-top:8px;min-height:1.6em}
+  .tips li{margin-bottom:6px}
+  .tips b{color:var(--accent)}
+  footer{color:var(--muted);text-align:center;font-size:.85rem;padding:20px 0}
+  .sticky{position:sticky;top:8px;z-index:5}
+  @media (max-width:820px){.sticky{position:static}}
+  .chk{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>استوديو <span>الصوت</span></h1>
+      <p>صوت احترافي لإعلاناتك ومقاطعك — كل المعالجة على جهازك، ما بينرفع شي لأي سيرفر</p>
+    </div>
+  </header>
+
+  <label id="drop" class="card">
+    <div class="big"><b>🎙️ ارفع تسجيلك الصوتي</b><small>mp3 · m4a · wav · ogg — أو فيديو mp4 وبيتطلّع الصوت منه</small><br><br></div>
+    <span class="btn primary">اختر ملف</span>
+    <div id="fname" style="margin-top:8px;color:var(--muted)"></div>
+    <input type="file" id="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.ogg,.aac,.mp4" hidden>
+  </label>
+
+  <div class="app grid">
+    <div class="sticky">
+      <div class="card player">
+        <canvas id="wave"></canvas>
+        <div class="meta"><span>اضغط على الموجة للتنقّل</span><span id="time">0:00 / 0:00</span></div>
+        <div class="row">
+          <button class="btn primary" id="play">▶ تشغيل</button>
+          <button class="btn ghost" id="stop">⏹</button>
+          <div class="grow"></div>
+          <div class="seg" title="قارن الصوت قبل وبعد (بنفس مستوى الارتفاع لمقارنة عادلة)">
+            <label><input type="radio" name="ab" value="orig"><span>الأصلي</span></label>
+            <label><input type="radio" name="ab" value="pro" checked><span>بعد المعالجة</span></label>
+          </div>
+        </div>
+        <canvas id="spec"></canvas>
+        <div class="meters">
+          <div class="meter"><div>الارتفاع الأصلي</div><b id="mIn">—</b></div>
+          <div class="meter"><div>الهدف (LUFS)</div><b id="mOut">—</b></div>
+          <div class="meter"><div>تعديل المستوى</div><b id="mGain">—</b></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <summary style="list-style:none;cursor:default">🎚️ خامة الصوت والقوالب</summary>
+        <div class="row" style="margin-top:10px">
+          <select id="preset" class="grow"></select>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="save">💾 حفظ كقالب</button>
+          <button class="btn ghost" id="del">🗑 حذف</button>
+          <button class="btn ghost" id="exportT">⬇ تصدير القوالب</button>
+          <label class="btn ghost">⬆ استيراد<input type="file" id="importT" accept=".json,application/json"></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <summary style="list-style:none;cursor:default">📤 التصدير</summary>
+        <div class="row" style="margin-top:10px">
+          <select id="target" class="grow"></select>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="chk"><input type="checkbox" id="stereo" checked> ستيريو (أنسب للمونتاج والمنصات)</label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary grow" id="mp3">⬇ تحميل MP3</button>
+          <button class="btn grow" id="wav">⬇ تحميل WAV (أعلى جودة)</button>
+        </div>
+        <div id="done"></div>
+      </div>
+    </div>
+
+    <div id="controls"></div>
+  </div>
+
+  <details class="card tips">
+    <summary>💡 أفضل الممارسات لصوت إعلاني احترافي</summary>
+    <ol>
+      <li><b>التسجيل أهم من المعالجة:</b> سجّل بغرفة فيها أثاث وستاير، أو جوّا الخزانة بين التياب. الفلاتر ما بتصلّح صدى قوي.</li>
+      <li><b>المسافة:</b> 15–20 سم من المايك، ومائل شوي عن التم لتتجنب نفخة حرف الباء والهوا.</li>
+      <li><b>ثانيتين صمت</b> ببداية التسجيل: الأداة بتتعلّم منهم شكل الضجة وبتشيلها بدقة أعلى.</li>
+      <li><b>الترتيب الصحيح:</b> نظّف أولاً (ضجة + قص الواطي) ← بعدين الخامة (EQ) ← بعدين الضغط ← وآخر شي الصدى.</li>
+      <li><b>قارن دايماً</b> بزر «الأصلي / بعد المعالجة»: الأداة بتخلّي المستويين متساويين، فإذا الأصلي أحلى يعني بالغت.</li>
+      <li><b>إزالة الضجة:</b> ابدأ من 40–60%. إذا صار الصوت “معدني” أو “تحت الماي” نزّلها.</li>
+      <li><b>العمق:</b> طبقة -1 أو -2 مع فخامة +3 إلى +5 بتعطي صوت إذاعي. أكثر من هيك بيبين مصطنع.</li>
+      <li><b>الصدى للإعلانات:</b> قليل جداً أو بدون. الصوت القريب والجاف بيبيع أكثر.</li>
+      <li><b>المستوى:</b> ‎-14 LUFS لإنستغرام وتيك توك ويوتيوب وفيسبوك. لو رح تحط موسيقى بالمونتاج، خلّي الموسيقى أوطى من الصوت بـ 15–20 dB.</li>
+      <li><b>اسمع على سماعات وعلى سبيكر الموبايل:</b> أغلب جمهورك رح يسمع من الموبايل، فالوضوح (3.5kHz) أهم من العمق.</li>
+    </ol>
+  </details>
+
+  <footer>صنع بواسطة هايبر تك للحلول الذكية</footer>
+</div>
+<div id="status"></div>
+<script src="lame.min.js"></script>
+<script src="dsp.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
