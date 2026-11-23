@@ -58,6 +58,7 @@ jobs:
           cp -r saytara _site/saytara
           cp -r nitro _site/nitro
           cp -r arrows _site/arrows
+          cp -r voice-studio _site/voice-studio
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
